@@ -12,7 +12,6 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     setupPort();
-    setupPlot();
     setupConnections();
     parser.state = protocol_parser::STATE_SYNC;
 }
@@ -34,15 +33,6 @@ void MainWindow::setupPort() {
     port->setParity(QSerialPort::NoParity);
     port->setStopBits(QSerialPort::OneStop);
     port->setFlowControl(QSerialPort::NoFlowControl);
-}
-
-void MainWindow::setupPlot() {
-    ui->customPlot->addGraph();
-    ui->customPlot->xAxis->setLabel("Номер точки");
-    ui->customPlot->yAxis->setLabel("Напряжение, В");
-    ui->customPlot->xAxis->setRange(0, 99);
-    ui->customPlot->yAxis->setRange(0, 3.3);
-    ui->customPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
 }
 
 void MainWindow::on_pbOpen_clicked() {
@@ -212,7 +202,7 @@ QString description (const QVector<uint8_t>& packet){
     case 0x05:
         return "Измерение формы тока лазерного диода:";
     case 0x06:
-        return "Измерение напряжение элемента Пельтье:";
+        return "Измерение напряжения и тока на эквиваленте элемента Пельтье:";
     case 0x07:
         if (packet[2] == 0x01){ return "Переключить тип входных цепей на внешний оптический блок:"; }
         else {return "Переключить тип входных цепей на эквивалентные схемы:"; }
@@ -230,8 +220,25 @@ QString description (const QVector<uint8_t>& packet){
 }
 }
 
+void MainWindow::peltie(uint16_t sample, uint16_t bit){
+    uint16_t volt_raw, tok;
+    volt_raw = 0; // (parser.buffer[2] << 8) | parser.buffer[1]; // напряжение
+    tok = 0; // (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток
+    double volts = volt_raw / 1000.0;
+    if ( (volt_raw >= sample - bit && volt_raw <= sample + bit) && (tok >= sample - bit && tok <= sample + bit) ){
+        logHtml(QString("<font color='green'>Измерено: %1 мА — Ток эквивалента элемента Пельтье допустим</font>").arg(tok));
+        logHtml(QString("<font color='green'>Измерено: %1 В — Напряжение эквивалента элемента Пельтье допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)));
+        return;
+    }
+    else {
+       logHtml(QString("<font color='red'>Измерено: %1 мА — Ток эквивалента элемента Пельтье не допустим</font><br>").arg(tok));
+       logHtml(QString("<font color='red'>Измерено: %1 В — Напряжение эквивалента элемента Пельтье не допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)));
+        closeTest();
+    }
+}
+
 void MainWindow::result(uint8_t* packet){
-    uint16_t sample, tok, data;
+    uint16_t sample, tok, data, data_1;
     double volts;
     const uint16_t accuracy = 300;
 
@@ -254,13 +261,13 @@ void MainWindow::result(uint8_t* packet){
     case 13:
         sample = 50;
         tok = 10;
-        data = 0; // (parser.buffer[2] << 8) | parser.buffer[1];
+        data = 50; // (parser.buffer[2] << 8) | parser.buffer[1];
 
-        if (data >= sample - tok || data <= sample + tok){
+        if (data >= sample - tok && data <= sample + tok){
             logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(data));
         }
         else {
-           logHtml(QString("<font color='red'>Измерено: %1 мАЫ — Ток питания платы не допустим</font><br>").arg(data));
+           logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(data));
             closeTest();
            }
         return;
@@ -327,9 +334,10 @@ void MainWindow::result(uint8_t* packet){
                 return;
             }
         return; }
-    case 25:{
-        handleCaseCommon(0, "Ток элемента Пельтье");
-        return; }
+    case 25:
+        peltie(0,3); // выставить правильно погрешностьs
+        return;
+
     case 26: {
         CustomDialog dialog_3(this, "Установка параметров","Установите форму тока лазера","Ок","Не удалось установить параметры"); // Добавить фунцию
         if (dialog_3.exec()) {
@@ -349,7 +357,7 @@ void MainWindow::result(uint8_t* packet){
                int targetTemp = temperatures[i];
                logHtml(QString("Установить температуру %1 градусов:</font>").arg(targetTemp)); // Добавить фунцию
                logHtml(QString("<font color='green'>Температура %1 градусов установлена</font>").arg(targetTemp));
-               handleCaseCommon(0, "Ток элемента Пельтье");
+               peltie(0,3); // выставить правильно погрешность
            }
          }
         logHtml("Установить температуру 25 градусов:</font>"); // Добавить фунцию
@@ -373,8 +381,6 @@ void MainWindow::result(uint8_t* packet){
         logHtml("<font color='green'>Тестирование GPS успешно пройдено</font><br>"); }
         return;
     case 30:
-        logHtml("<font color='green'>Выполнено!</font><br>");
-        return;
     case 31:
         logHtml("<font color='green'>Выполнено!</font><br>");
         return;

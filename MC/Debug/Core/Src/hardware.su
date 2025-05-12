@@ -11,7 +11,7 @@
 ../Core/Src/hardware.c:193:6:apply_voltage_relay_2	16	static
 ../Core/Src/hardware.c:218:6:test_voltage_11_point	16	static
 ../Core/Src/hardware.c:275:6:test_corrent_laser	240	static
-../Core/Src/hardware.c:302:6:test_voltage_peltie	56	static
-../Core/Src/hardware.c:364:6:apply_voltage_relay_5	16	static
-../Core/Src/hardware.c:389:6:massage_rs232	48	static
-../Core/Src/hardware.c:408:6:massage_gps	136	static
+../Core/Src/hardware.c:302:6:test_voltage_peltie	64	static
+../Core/Src/hardware.c:363:6:apply_voltage_relay_5	16	static
+../Core/Src/hardware.c:388:6:massage_rs232	48	static
+../Core/Src/hardware.c:407:6:massage_gps	136	static

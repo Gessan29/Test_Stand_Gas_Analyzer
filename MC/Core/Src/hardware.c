@@ -278,7 +278,7 @@ void test_corrent_laser(uint8_t* buf)
 	ADC_ChannelConfTypeDef sConfig = {0};
 	sConfig.Channel = ADC_LASER;
 	sConfig.Rank = 1;
-	sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+	sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
 		    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
 		    {
 		    	buf[0] = STATUS_EXEC_ERROR;
@@ -301,9 +301,8 @@ void test_corrent_laser(uint8_t* buf)
 
 void test_voltage_peltie(uint8_t* buf)
 {
-
-	int32_t tok, vol_average_1 = 0, vol_average_2 = 0;
-	uint32_t res_shunt = RES_SHUNT_PELTIE;
+	int32_t vol_raw, tok = 0, vol_average_1 = 0, vol_average_2 = 0;
+	int32_t res_shunt = RES_SHUNT_PELTIE;
 	ADC_ChannelConfTypeDef sConfig = {0};
 
 	sConfig.Channel = ADC_PELTIE_1;
@@ -347,15 +346,15 @@ void test_voltage_peltie(uint8_t* buf)
 	vol_average_2 = vol_average_2 * REFERENCE_VOLTAGE / (ADC_BIT_RATE * SAMPLES);
 
 	tok = vol_average_1 - vol_average_2;
+	buf[1] = (uint8_t)(tok & 0xFF);
+	buf[2] = (uint8_t)(tok >> 8 & 0xFF);
 	if (tok > 0) {
 		buf[0] = STATUS_EXEC_ERROR;
-		tok = (vol_average_2 * 1000) / res_shunt; // мкА
+		tok = (tok * 1000000) / res_shunt; // мкА
 	} else {
 		buf[0] = STATUS_OK;
-		tok = (vol_average_1 * 1000) / res_shunt; // мкА
+		tok = (tok * 1000000) / res_shunt; // мкА
 	}
-	buf[1] = (uint8_t)(tok & 0xFF);
-    buf[2] = (uint8_t)(tok >> 8 & 0xFF);
 	buf[3] = (uint8_t)(tok >> 16 & 0xFF);
 	buf[4] = (uint8_t)(tok >> 24 & 0xFF);
 	return;

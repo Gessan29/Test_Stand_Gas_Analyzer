@@ -41,7 +41,7 @@ private slots:
     void handleCaseCommon(uint16_t sample, const QString& labelText);
     void plotAdcData(const QByteArray& byteArray);
     void setupPort();
-    void setupPlot();
+    void peltie(uint16_t sample, uint16_t bit);
     void setupConnections();
     void onResponseTimeout();
     void closeTest();

@@ -12,6 +12,6 @@
 ../Core/Src/hardware.c:218:6:test_voltage_11_point	12
 ../Core/Src/hardware.c:275:6:test_corrent_laser	5
 ../Core/Src/hardware.c:302:6:test_voltage_peltie	8
-../Core/Src/hardware.c:364:6:apply_voltage_relay_5	5
-../Core/Src/hardware.c:389:6:massage_rs232	4
-../Core/Src/hardware.c:408:6:massage_gps	3
+../Core/Src/hardware.c:363:6:apply_voltage_relay_5	5
+../Core/Src/hardware.c:388:6:massage_rs232	4
+../Core/Src/hardware.c:407:6:massage_gps	3
