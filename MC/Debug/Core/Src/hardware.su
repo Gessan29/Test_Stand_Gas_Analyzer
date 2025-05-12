@@ -1,0 +1,17 @@
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_adc.h:4290:26:LL_ADC_IsActiveFlag_EOCS	16	static
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_adc.h:4343:22:LL_ADC_ClearFlag_EOCS	16	static
+../Core/Src/hardware.c:17:6:set_pins	24	static
+../Core/Src/hardware.c:25:6:test_voltage	40	static
+../Core/Src/hardware.c:56:6:apply_relay	16	static
+../Core/Src/hardware.c:60:6:uart_tx_rx	24	static
+../Core/Src/hardware.c:79:5:compare_arrays	32	static
+../Core/Src/hardware.c:93:6:apply_voltage_relay_1	16	static
+../Core/Src/hardware.c:118:6:test_voltage_4_point	16	static
+../Core/Src/hardware.c:146:6:test_voltage_current	48	static
+../Core/Src/hardware.c:193:6:apply_voltage_relay_2	16	static
+../Core/Src/hardware.c:218:6:test_voltage_11_point	16	static
+../Core/Src/hardware.c:275:6:test_corrent_laser	240	static
+../Core/Src/hardware.c:302:6:test_voltage_peltie	56	static
+../Core/Src/hardware.c:364:6:apply_voltage_relay_5	16	static
+../Core/Src/hardware.c:389:6:massage_rs232	48	static
+../Core/Src/hardware.c:408:6:massage_gps	136	static

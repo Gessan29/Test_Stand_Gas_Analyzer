@@ -1,0 +1,6 @@
+../Core/Src/parser.c:14:17:update_crc	1
+../Core/Src/parser.c:19:17:calculate_crc	2
+../Core/Src/parser.c:27:6:serialize_reply	2
+../Core/Src/parser.c:49:20:process_rx_byte	14
+../Core/Src/parser.c:100:6:choose_command	11
+../Core/Src/parser.c:140:6:transmission	3
