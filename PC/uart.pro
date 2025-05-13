@@ -1,4 +1,4 @@
-QT       += core gui serialport printsupport
+QT       += core gui serialport printsupport network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -13,15 +13,31 @@ SOURCES += \
     mainwindow.cpp \
     protocol_parser.cpp \
     qcustomplot.cpp \
-    uart.cpp
+    uart.cpp \
+    um_receiver_base.cpp \
+    um_receiver_rs232.cpp \
+    um_receiver_udp.cpp \
+    um_sender_base.cpp \
+    um_sender_rs232.cpp \
+    um_sender_udp.cpp
 
 
 HEADERS += \
     customdialog.h \
+    data_logger_defs.h \
     mainwindow.h \
     protocol_parser.h \
     qcustomplot.h \
-    uart.h
+    uart.h \
+    um_defs.h \
+    um_protocol_defs.h \
+    um_receiver_base.h \
+    um_receiver_rs232.h \
+    um_receiver_udp.h \
+    um_sender_base.h \
+    um_sender_rs232.h \
+    um_sender_udp.h
+
 
 FORMS += \
     mainwindow.ui
