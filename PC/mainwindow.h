@@ -3,14 +3,14 @@
 
 #include <QMainWindow>
 #include <QSerialPort>
-#include <QSerialPortInfo>
 #include <QVector>
-
 #include <QMessageBox>
 #include <QString>
 #include <QWidget>
+
 #include "protocol_parser.h"
 #include "customdialog.h"
+#include "func_acm.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -45,11 +45,14 @@ private slots:
     void setupConnections();
     void onResponseTimeout();
     void closeTest();
+    bool Set_RS_232();
     void logHtml(const QString& message);
     void logPlain(const QString& message);
+    void on_rs232_readyRead();
 private:
     Ui::MainWindow *ui;
     QSerialPort *port;
+    QSerialPort* rs232Port = nullptr;
     QTimer* sendTimer; // таймер для отправки следующих пакетов через задержку
     QTimer* responseTimer; // таймер ожидания ответа от МК
     struct protocol_parser parser;

@@ -7,6 +7,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , port(new QSerialPort(this))
+    , rs232Port(new QSerialPort(this))
     , sendTimer(new QTimer(this))
     , responseTimer(new QTimer(this))
 {
@@ -25,6 +26,7 @@ void MainWindow::setupConnections() {
     connect(sendTimer, &QTimer::timeout, this, &MainWindow::sendNextPacket);
     connect(port, &QSerialPort::readyRead, this, &MainWindow::on_port_ready_read);
     connect(responseTimer, &QTimer::timeout, this, &MainWindow::onResponseTimeout);
+    connect(rs232Port, &QSerialPort::readyRead, this, &MainWindow::on_rs232_readyRead);
     responseTimer->setSingleShot(true);
 }
 
@@ -55,7 +57,7 @@ void MainWindow::on_pbOpen_clicked() {
 
 void MainWindow::onResponseTimeout() {
     logHtml("<font color='red'>Ошибка: не получен ответ в течение 10 секунд</font><br>");
-    stopTesting();
+    closeTest();
 }
 
 void MainWindow::on_port_ready_read() {
@@ -66,6 +68,16 @@ void MainWindow::on_port_ready_read() {
         const parser_result res = process_rx_byte(&parser, static_cast<uint8_t>(byte));
         if (res == PARSER_DONE) handleParsedPacket();
         else if (res == PARSER_ERROR) handleParserError();
+    }
+}
+
+void MainWindow::on_rs232_readyRead()
+{
+    QByteArray data = rs232Port->readAll();
+
+    if (!data.isEmpty()) {
+        logHtml("<font color='blue'>Получено от RS-232:</font> " + data.toHex(' ').toUpper() + "<br>");
+        get_settings();
     }
 }
 
@@ -88,8 +100,31 @@ void MainWindow::logPlain(const QString& message) {
     ui->plainTextEdit->appendPlainText(message);
 }
 
+bool MainWindow::Set_RS_232(){
+    QString rs232PortName = "COM" + QString::number(ui->sbxPort->value());
+    rs232Port->setPortName(rs232PortName);
+    rs232Port->setBaudRate(115200);
+
+    rs232Port->setDataBits(QSerialPort::Data8);
+    rs232Port->setParity(QSerialPort::NoParity);
+    rs232Port->setStopBits(QSerialPort::OneStop);
+    rs232Port->setFlowControl(QSerialPort::NoFlowControl);
+
+    if (!rs232Port->open(QIODevice::ReadWrite)) {
+        logHtml("<font color='red'>Ошибка открытия RS-232 на порту " + rs232PortName + "</font><br>");
+        return false;
+    } else {
+        logHtml("<font color='green'>RS-232 подключен к порту " + rs232PortName + "</font><br>");
+        return true;
+    }
+}
+
 void MainWindow::startTesting()
 {
+    if (!Set_RS_232()) {
+            closeTest();
+            return;
+    }
     currentPacketIndex = 0;
     testPackets = {
         {0x01, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x01, 0x07, 0x00, 0x00, 0x00, 0x00}, {0x01, 0x03, 0x00, 0x00, 0x00, 0x00},
@@ -108,7 +143,7 @@ void MainWindow::startTesting()
         {0x00, 0x06},
         {0x00, 0x08},
         {0x01, 0x09, 0x0A, 0x00, 0x00, 0x00},
-        /*{0x01, 0x09, 0x0B, 0x00, 0x00, 0x00}
+        {0x01, 0x09, 0x0B, 0x00, 0x00, 0x00},
         {0x01, 0x09, 0x0C, 0x00, 0x00, 0x00},
         {0x01, 0x09, 0x0D, 0x00, 0x00, 0x00},
         {0x01, 0x09, 0x0E, 0x00, 0x00, 0x00},
@@ -116,7 +151,7 @@ void MainWindow::startTesting()
         {0x01, 0x09, 0x10, 0x00, 0x00, 0x00},
         {0x01, 0x09, 0x11, 0x00, 0x00, 0x00},
         {0x01, 0x09, 0x12, 0x00, 0x00, 0x00},
-        {0x01, 0x09, 0x13, 0x00, 0x00, 0x00}*/
+        {0x01, 0x09, 0x13, 0x00, 0x00, 0x00},
         // 26 пункт и далее:
         {0x01, 0x00, 0x00, 0x00, 0x00, 0x00},
         {0x01, 0x07, 0x01, 0x00, 0x00, 0x00},
@@ -172,8 +207,8 @@ QString description (const QVector<uint8_t>& packet){
         if (packet[2] == 0x00){ return "Измерение напряжения питания платы:"; }
         else {return "Измерение тока питания платы:"; }
     case 0x03:
-        if (packet[2] == 0x01){ return "Подключение резисторов имитации:"; }
-        else {return "Отключение резисторов имитации:"; }
+        if (packet[2] == 0x01){ return "Включение вторичного питания платы АЦМ:"; }
+        else {return "Отключение вторичного питания платы АЦМ:"; }
     case 0x04:
         switch (packet[2]){
         case 0x00:
@@ -222,8 +257,8 @@ QString description (const QVector<uint8_t>& packet){
 
 void MainWindow::peltie(uint16_t sample, uint16_t bit){
     uint16_t volt_raw, tok;
-    volt_raw = 0; // (parser.buffer[2] << 8) | parser.buffer[1]; // напряжение
-    tok = 0; // (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток
+    volt_raw = (parser.buffer[2] << 8) | parser.buffer[1];; // (parser.buffer[2] << 8) | parser.buffer[1]; // напряжение 0
+    tok = (parser.buffer[3] << 16) | parser.buffer[4] << 24;; // (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток 0
     double volts = volt_raw / 1000.0;
     if ( (volt_raw >= sample - bit && volt_raw <= sample + bit) && (tok >= sample - bit && tok <= sample + bit) ){
         logHtml(QString("<font color='green'>Измерено: %1 мА — Ток эквивалента элемента Пельтье допустим</font>").arg(tok));
@@ -261,7 +296,7 @@ void MainWindow::result(uint8_t* packet){
     case 13:
         sample = 50;
         tok = 10;
-        data = 50; // (parser.buffer[2] << 8) | parser.buffer[1];
+        data = (parser.buffer[2] << 8) | parser.buffer[1];; // 50
 
         if (data >= sample - tok && data <= sample + tok){
             logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(data));
@@ -325,8 +360,8 @@ void MainWindow::result(uint8_t* packet){
                 closeTest();
                 return;
             }
-        CustomDialog dialog_2(this, "Сообщение","Отправьте команду плате АЦМ","Ок","Не удалось отправить"); // Добавить фунцию
-        if (dialog_2.exec()) {
+
+        if (set_test_settings()) {
                 logHtml("<font color='green'>Команда плате АЦМ отправлена. Продолжение теста...</font><br>");
             } else {
                 logHtml("<font color='red'>Команда плате АЦМ не отправлена.</font><br>");
@@ -339,8 +374,8 @@ void MainWindow::result(uint8_t* packet){
         return;
 
     case 26: {
-        CustomDialog dialog_3(this, "Установка параметров","Установите форму тока лазера","Ок","Не удалось установить параметры"); // Добавить фунцию
-        if (dialog_3.exec()) {
+
+        if (set_laser_settings(1)) {
                 logHtml("<font color='green'>Форма тока лазера установлена. Продолжение теста...</font>");
             } else {
                 logHtml("<font color='red'>Форма тока лазера не установлена.</font><br>");
@@ -355,19 +390,27 @@ void MainWindow::result(uint8_t* packet){
         std::vector<int> temperatures = {28, 22, 55, -5};
         if (i < temperatures.size()) {
                int targetTemp = temperatures[i];
-               logHtml(QString("Установить температуру %1 градусов:</font>").arg(targetTemp)); // Добавить фунцию
+               if (!set_temp_mode(targetTemp)) {
+                   logHtml(QString("<font color='red'>Температура %1 градусов не установлена</font>").arg(targetTemp));
+                   closeTest();
+                   return;
+               }
                logHtml(QString("<font color='green'>Температура %1 градусов установлена</font>").arg(targetTemp));
                peltie(0,3); // выставить правильно погрешность
            }
          }
-        logHtml("Установить температуру 25 градусов:</font>"); // Добавить фунцию
+        if (!set_temp_mode(25)) {
+            logHtml("<font color='red'>Температура 25 градусов не установлена</font>");
+            closeTest();
+            return;
+        }
         logHtml("<font color='green'>Температура 25 градусов установлена</font><br>");
         return; }
     case 28:
         logHtml("<font color='green'>Тестирование RS-232 успешно пройдено</font><br>");
         return;
     case 29:
-    /*case 30: //еще 9 измерений для GPS не забыть вернуть, сейчас только одно
+    case 30: //еще 9 измерений для GPS не забыть вернуть, сейчас только одно
     case 31:
     case 32:
     case 33:
@@ -375,21 +418,17 @@ void MainWindow::result(uint8_t* packet){
     case 35:
     case 36:
     case 37:
-    case 38:*/
+    case 38:
         sendTimer->start(1000);
-        if (currentPacketIndex == 29){ // поменять на 38
+        if (currentPacketIndex == 38){ // поменять на 38
         logHtml("<font color='green'>Тестирование GPS успешно пройдено</font><br>"); }
         return;
-    case 30:
-    case 31:
+    case 39:
+    case 40:
         logHtml("<font color='green'>Выполнено!</font><br>");
         return;
-    case 32:
+    case 41:
         logHtml("<font color='green'>Выполнено!</font><br>");
-        sendTimer->stop();
-        responseTimer->stop();
-        CustomDialog dialog_4(this, "Проверка","Ожидание ответа от пользователя","Продолжить"); // Добавить фунцию
-        dialog_4.exec();
         logHtml("<font color='green'>Тестирование успешно пройдено!</font><br>");
         closeTest();
         return;
@@ -428,8 +467,8 @@ void MainWindow::plotAdcData(const QByteArray& byteArray) {
 
 void MainWindow::handleCaseCommon(uint16_t sample, const QString& labelText)
 {
-    const uint16_t accuracy = 10000; // 300
-    uint16_t data = 10000; //(parser.buffer[2] << 8) | parser.buffer[1];
+    const uint16_t accuracy = 300; // 10000
+    uint16_t data = (parser.buffer[2] << 8) | parser.buffer[1]; //(parser.buffer[2] << 8) | parser.buffer[1];   10 000
     double volts = data / 1000.0;
 
     if (data >= sample - accuracy && data <= sample + accuracy) {
@@ -505,6 +544,9 @@ void MainWindow::stopTesting()
     isTesting = false;
     emergencyStopTriggered = false;
     currentPacketIndex = 0;
+    if (rs232Port->isOpen()) {
+        rs232Port->close();
+    }
     ui->pushButton->setText("Начать тестирование");
     logHtml("<font color='orange'><br>Тестирование завершено</font><br>");
 }
