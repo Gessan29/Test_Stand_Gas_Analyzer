@@ -89,7 +89,7 @@ void MainWindow::on_pushButton_clicked() {
 
     isTesting = !isTesting;
     ui->pushButton->setText(isTesting ? "Остановить" : "Начать");
-    isTesting ? startTesting() : stopTesting();
+    isTesting ? startTesting() : closeTest();
 }
 
 void MainWindow::logHtml(const QString& message) {
@@ -152,7 +152,6 @@ void MainWindow::startTesting()
         {0x01, 0x09, 0x11, 0x00, 0x00, 0x00},
         {0x01, 0x09, 0x12, 0x00, 0x00, 0x00},
         {0x01, 0x09, 0x13, 0x00, 0x00, 0x00},
-        // 26 пункт и далее:
         {0x01, 0x00, 0x00, 0x00, 0x00, 0x00},
         {0x01, 0x07, 0x01, 0x00, 0x00, 0x00},
         {0x01, 0x00, 0x01, 0x00, 0x00, 0x00},
@@ -257,8 +256,8 @@ QString description (const QVector<uint8_t>& packet){
 
 void MainWindow::peltie(uint16_t sample, uint16_t bit){
     uint16_t volt_raw, tok;
-    volt_raw = (parser.buffer[2] << 8) | parser.buffer[1];; // (parser.buffer[2] << 8) | parser.buffer[1]; // напряжение 0
-    tok = (parser.buffer[3] << 16) | parser.buffer[4] << 24;; // (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток 0
+    volt_raw = (parser.buffer[2] << 8) | parser.buffer[1]; // напряжение 0
+    tok = (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток 0
     double volts = volt_raw / 1000.0;
     if ( (volt_raw >= sample - bit && volt_raw <= sample + bit) && (tok >= sample - bit && tok <= sample + bit) ){
         logHtml(QString("<font color='green'>Измерено: %1 мА — Ток эквивалента элемента Пельтье допустим</font>").arg(tok));
@@ -273,10 +272,6 @@ void MainWindow::peltie(uint16_t sample, uint16_t bit){
 }
 
 void MainWindow::result(uint8_t* packet){
-    uint16_t sample, tok, data, data_1;
-    double volts;
-    const uint16_t accuracy = 300;
-
     switch (currentPacketIndex){
 
     case 1:
@@ -293,10 +288,10 @@ void MainWindow::result(uint8_t* packet){
         return;
 
     case 6:
-    case 13:
-        sample = 50;
-        tok = 10;
-        data = (parser.buffer[2] << 8) | parser.buffer[1];; // 50
+    case 13:{
+        uint16_t sample = 50;
+        uint16_t tok = 10;
+        uint16_t data = (parser.buffer[2] << 8) | parser.buffer[1]; // 50
 
         if (data >= sample - tok && data <= sample + tok){
             logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(data));
@@ -305,7 +300,7 @@ void MainWindow::result(uint8_t* packet){
            logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(data));
             closeTest();
            }
-        return;
+        return; }
     case 7:
         handleCaseCommon(6000, "Контрольная точка -6 В");
         return;
@@ -352,7 +347,7 @@ void MainWindow::result(uint8_t* packet){
         handleCaseCommon(0, "Контрольная точка +2.048 В (VrefDAC)");
         sendTimer->stop();
         responseTimer->stop();
-        CustomDialog dialog_1(this,"Выполните условие", "Прошейте МК и ПЛИС","Ок","Не удалось прошить"); // Добавить фунцию
+        CustomDialog dialog_1(this,"Выполните условие", "Прошейте МК и ПЛИС","Ок","Не удалось прошить");
         if (dialog_1.exec()) {
                 logHtml("<font color='green'>МК и ПЛИС прошиты. Продолжение теста...</font><br>");
             } else {
@@ -362,7 +357,7 @@ void MainWindow::result(uint8_t* packet){
             }
 
         if (set_test_settings()) {
-                logHtml("<font color='green'>Команда плате АЦМ отправлена. Продолжение теста...</font><br>");
+                logHtml("<font color='green'></font><br>");
             } else {
                 logHtml("<font color='red'>Команда плате АЦМ не отправлена.</font><br>");
                 closeTest();
@@ -370,7 +365,7 @@ void MainWindow::result(uint8_t* packet){
             }
         return; }
     case 25:
-        peltie(0,3); // выставить правильно погрешностьs
+        peltie(0,3); // выставить правильно погрешность
         return;
 
     case 26: {
@@ -386,7 +381,7 @@ void MainWindow::result(uint8_t* packet){
         plotAdcData(rawData);
         return; }
     case 27: {
-        for (int i = 0; i < 4; i++){
+        for (size_t i = 0; i < 4; i++){
         std::vector<int> temperatures = {28, 22, 55, -5};
         if (i < temperatures.size()) {
                int targetTemp = temperatures[i];
@@ -410,7 +405,7 @@ void MainWindow::result(uint8_t* packet){
         logHtml("<font color='green'>Тестирование RS-232 успешно пройдено</font><br>");
         return;
     case 29:
-    case 30: //еще 9 измерений для GPS не забыть вернуть, сейчас только одно
+    case 30:
     case 31:
     case 32:
     case 33:
@@ -420,7 +415,7 @@ void MainWindow::result(uint8_t* packet){
     case 37:
     case 38:
         sendTimer->start(1000);
-        if (currentPacketIndex == 38){ // поменять на 38
+        if (currentPacketIndex == 38){
         logHtml("<font color='green'>Тестирование GPS успешно пройдено</font><br>"); }
         return;
     case 39:
@@ -468,7 +463,7 @@ void MainWindow::plotAdcData(const QByteArray& byteArray) {
 void MainWindow::handleCaseCommon(uint16_t sample, const QString& labelText)
 {
     const uint16_t accuracy = 300; // 10000
-    uint16_t data = (parser.buffer[2] << 8) | parser.buffer[1]; //(parser.buffer[2] << 8) | parser.buffer[1];   10 000
+    uint16_t data = (parser.buffer[2] << 8) | parser.buffer[1]; // 10 000
     double volts = data / 1000.0;
 
     if (data >= sample - accuracy && data <= sample + accuracy) {
