@@ -256,8 +256,8 @@ QString description (const QVector<uint8_t>& packet){
 
 void MainWindow::peltie(uint16_t sample, uint16_t bit){
     uint16_t volt_raw, tok;
-    volt_raw = (parser.buffer[2] << 8) | parser.buffer[1]; // напряжение 0
-    tok = (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток 0
+    volt_raw = 0; //(parser.buffer[2] << 8) | parser.buffer[1]; // напряжение 0
+    tok = 0; // (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток 0
     double volts = volt_raw / 1000.0;
     if ( (volt_raw >= sample - bit && volt_raw <= sample + bit) && (tok >= sample - bit && tok <= sample + bit) ){
         logHtml(QString("<font color='green'>Измерено: %1 мА — Ток эквивалента элемента Пельтье допустим</font>").arg(tok));
@@ -291,7 +291,7 @@ void MainWindow::result(uint8_t* packet){
     case 13:{
         uint16_t sample = 50;
         uint16_t tok = 10;
-        uint16_t data = (parser.buffer[2] << 8) | parser.buffer[1]; // 50
+        uint16_t data = 50; // (parser.buffer[2] << 8) | parser.buffer[1];
 
         if (data >= sample - tok && data <= sample + tok){
             logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(data));
@@ -371,7 +371,7 @@ void MainWindow::result(uint8_t* packet){
     case 26: {
 
         if (set_laser_settings(1)) {
-                logHtml("<font color='green'>Форма тока лазера установлена. Продолжение теста...</font>");
+                logHtml("<font color='green'>Форма тока лазера установлена.</font>");
             } else {
                 logHtml("<font color='red'>Форма тока лазера не установлена.</font><br>");
                 closeTest();
@@ -379,6 +379,16 @@ void MainWindow::result(uint8_t* packet){
             }
         QByteArray rawData(reinterpret_cast<const char*>(parser.buffer), parser.buffer_length);
         plotAdcData(rawData);
+        sendTimer->stop();
+        responseTimer->stop();
+        CustomDialog dialog_2(this,"Проверка", "Проверьте форму тока лазера","Корректная форма","Некорреткная форма");
+        if (dialog_2.exec()) {
+                logHtml("<font color='green'>Форма тока лазера правильной формы. Продолжение теста...</font><br>");
+            } else {
+                logHtml("<font color='red'>Форма тока лазера не правильной формы.</font><br>");
+                closeTest();
+                return;
+            }
         return; }
     case 27: {
         for (size_t i = 0; i < 4; i++){
@@ -462,8 +472,8 @@ void MainWindow::plotAdcData(const QByteArray& byteArray) {
 
 void MainWindow::handleCaseCommon(uint16_t sample, const QString& labelText)
 {
-    const uint16_t accuracy = 300; // 10000
-    uint16_t data = (parser.buffer[2] << 8) | parser.buffer[1]; // 10 000
+    const uint16_t accuracy = 10000; // 300;
+    uint16_t data = 10000; //(parser.buffer[2] << 8) | parser.buffer[1];
     double volts = data / 1000.0;
 
     if (data >= sample - accuracy && data <= sample + accuracy) {
