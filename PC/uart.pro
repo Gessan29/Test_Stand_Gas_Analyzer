@@ -14,7 +14,6 @@ SOURCES += \
     mainwindow.cpp \
     protocol_parser.cpp \
     qcustomplot.cpp \
-    test_mcu.cpp \
     uart.cpp
 
 
@@ -24,7 +23,6 @@ HEADERS += \
     mainwindow.h \
     protocol_parser.h \
     qcustomplot.h \
-    test_mcu.h \
     uart.h
 
 FORMS += \
