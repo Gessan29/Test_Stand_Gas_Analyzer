@@ -60,7 +60,7 @@ void MainWindow::onResponseTimeout() {
 
 void MainWindow::on_port_ready_read() {
     const QByteArray data = port->readAll();
-    //logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
+    logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
 
     for (const char byte : data) {
         const parser_result res = process_rx_byte(&parser, static_cast<uint8_t>(byte));
@@ -77,7 +77,7 @@ void MainWindow::on_pushButton_clicked() {
 
     isTesting = !isTesting;
     ui->pushButton->setText(isTesting ? "Остановить" : "Начать");
-    isTesting ? startTesting() : stopTesting();
+    isTesting ? startTesting() : closeTest();
 }
 
 void MainWindow::logHtml(const QString& message) {
@@ -130,7 +130,7 @@ void MainWindow::startTesting()
 
 void MainWindow::sendNextPacket()
 {
-    if (!isTesting || currentPacketIndex >= testPackets.size()) {
+    if ((!isTesting && !emergencyStopTriggered) || currentPacketIndex >= testPackets.size()) {
         stopTesting();
         return;
     }
@@ -148,9 +148,9 @@ void MainWindow::sendNextPacket()
          QByteArray byteArray(reinterpret_cast<const char*>(packet.buf), packetSize);
      port->write(byteArray);
 
-     //ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
-                                      //.arg(currentPacketIndex)
-                                      //.arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
+     ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
+                                      .arg(currentPacketIndex)
+                                      .arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
 
     responseTimer->start(10000);
     sendTimer->stop();
@@ -447,7 +447,7 @@ void MainWindow::handleParsedPacket()
         switch (parser.buffer[0]){
         case 0x00:
             result(parser.buffer);
-            if (isTesting) {
+            if (isTesting || emergencyStopTriggered) {
                 sendTimer->start(200);
                 return;
             }
@@ -484,7 +484,7 @@ void MainWindow::closeTest(){
                };
 
                currentPacketIndex = 0;
-               logHtml("<font color='orange'>Повтор команд для отключения питания...</font><br>");
+               logHtml("<font color='orange'>Отключение питания...</font><br>");
                sendTimer->start(100);
                return;
            }
