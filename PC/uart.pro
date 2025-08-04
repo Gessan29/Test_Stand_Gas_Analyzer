@@ -15,10 +15,8 @@ SOURCES += \
     qcustomplot.cpp \
     uart.cpp \
     um_receiver_base.cpp \
-    um_receiver_rs232.cpp \
     um_receiver_udp.cpp \
     um_sender_base.cpp \
-    um_sender_rs232.cpp \
     um_sender_udp.cpp
 
 
@@ -32,10 +30,8 @@ HEADERS += \
     um_defs.h \
     um_protocol_defs.h \
     um_receiver_base.h \
-    um_receiver_rs232.h \
     um_receiver_udp.h \
     um_sender_base.h \
-    um_sender_rs232.h \
     um_sender_udp.h
 
 
