@@ -11,6 +11,7 @@ class udp_um_receiver : public um_receiver_base
 public:
     udp_um_receiver(uint16_t listenPort, QObject * parent = nullptr);
     ~udp_um_receiver();
+    QUdpSocket* get_socket() const { return socket; }
 
 signals:
     // Ответ по сети

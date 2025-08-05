@@ -5,10 +5,15 @@
 #include <QSerialPort>
 #include <QSerialPortInfo>
 #include <QVector>
-
+#include "um_defs.h"
+#include "um_protocol_defs.h"
+#include "um_sender_udp.h"
+#include "um_receiver_udp.h"
 #include <QMessageBox>
 #include <QString>
 #include <QWidget>
+#include <QNetworkDatagram>
+#include <QUdpSocket>
 #include "protocol_parser.h"
 #include "customdialog.h"
 
@@ -28,8 +33,11 @@ public:
     ~MainWindow();
 
 private slots:
-    void on_port_ready_read();
+    void handleSerialData();  // Было on_port_ready_read
+    void handleDeviceFound(QHostAddress address);
+    void handleUdpData();
     void on_pbOpen_clicked();
+
     void sendNextPacket();
     void on_cleabutt_clicked();
     void stopTesting();
@@ -47,6 +55,7 @@ private slots:
     void closeTest();
     void logHtml(const QString& message);
     void logPlain(const QString& message);
+
 private:
     Ui::MainWindow *ui;
     QSerialPort *port;
@@ -58,6 +67,11 @@ private:
     bool isTesting = false; // флаг, идет ли сейчас тестирование
     bool emergencyStopTriggered = false;
     void sendPacket(uint8_t cmd, uint8_t status, uint8_t value);
+
+    udp_um_sender* udpSender;
+    udp_um_receiver* udpReceiver;
+    QHostAddress deviceAddress; // Адрес найденного устройства
+    bool ethernetConnected = false;
 
 };
 

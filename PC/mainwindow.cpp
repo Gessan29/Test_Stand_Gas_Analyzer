@@ -3,6 +3,12 @@
 #include <QTimer>
 #include <QVector>
 
+static const quint16 defaultSenderPort = 30000;
+static const quint16 defaultListenPort = 30001;
+static const quint32 defaultBaudrate = 115200;
+static const bool defaultInterfaceIsUDP = true;
+
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -14,6 +20,14 @@ MainWindow::MainWindow(QWidget *parent)
     setupPort();
     setupConnections();
     parser.state = protocol_parser::STATE_SYNC;
+
+    // Инициализация UDP
+    udpReceiver = new udp_um_receiver(defaultListenPort, this);
+    udpSender = new udp_um_sender(defaultSenderPort, this);
+
+    connect(port, &QSerialPort::readyRead, this, &MainWindow::handleSerialData);
+    connect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::handleDeviceFound);
+    connect(udpReceiver->get_socket(), &QUdpSocket::readyRead, this, &MainWindow::handleUdpData);
 }
 
 MainWindow::~MainWindow() {
@@ -23,9 +37,13 @@ MainWindow::~MainWindow() {
 
 void MainWindow::setupConnections() {
     connect(sendTimer, &QTimer::timeout, this, &MainWindow::sendNextPacket);
-    connect(port, &QSerialPort::readyRead, this, &MainWindow::on_port_ready_read);
     connect(responseTimer, &QTimer::timeout, this, &MainWindow::onResponseTimeout);
     responseTimer->setSingleShot(true);
+
+    //connect(port, &QSerialPort::readyRead, this, &MainWindow::handleSerialData);
+
+    //connect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::handleDeviceFound);
+    //connect(udpReceiver->get_socket(), &QUdpSocket::readyRead, this, &MainWindow::handleUdpData);
 }
 
 void MainWindow::setupPort() {
@@ -35,7 +53,41 @@ void MainWindow::setupPort() {
     port->setFlowControl(QSerialPort::NoFlowControl);
 }
 
+void MainWindow::handleDeviceFound(QHostAddress address){
+    deviceAddress = address;
+    logHtml(QString("<font color='green'>Устройство найдено по Ethernet: %1</font><br>").arg(address.toString()));
+
+    // Сохраняем адрес устройства для отправки
+    udpSender->device_found(address);
+}
+
+void MainWindow::handleUdpData(){
+    QUdpSocket* socket = udpReceiver->get_socket();
+        if (!socket) return;
+
+        while (socket->hasPendingDatagrams()) {
+            QByteArray datagram;
+            datagram.resize(socket->pendingDatagramSize());
+
+            QHostAddress sender;
+            quint16 senderPort;
+            socket->readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
+
+            logHtml(QString("<font color='blue'>UDP: %1</font><br>").arg(QString::fromUtf8(datagram.toHex(' ').toUpper())));
+
+            for (const char byte : datagram) {
+                const parser_result res = process_rx_byte(&parser, static_cast<uint8_t>(byte));
+                if (res == PARSER_DONE) handleParsedPacket();
+                else if (res == PARSER_ERROR) handleParserError();
+            }
+        }
+}
+
 void MainWindow::on_pbOpen_clicked() {
+
+    bool comOpened = false;
+    bool ethernetOpened = false;
+
     if (port->isOpen()) {
         port->close();
         ui->pbOpen->setText("Открыть порт");
@@ -51,6 +103,25 @@ void MainWindow::on_pbOpen_clicked() {
     } else {
         logHtml("<font color='red'>Ошибка открытия порта!</font><br>");
     }
+
+    // Управление Ethernet подключением
+        if (ethernetConnected) {
+            // Закрываем Ethernet соединение (если нужно)
+            ethernetConnected = false;
+            logHtml("<font color='orange'>Ethernet соединение закрыто!</font><br>");
+        } else {
+            // Инициируем поиск устройства
+            udpSender->send_search_packet();
+            ethernetConnected = true;
+            logHtml("<font color='blue'>Поиск устройства по Ethernet...</font><br>");
+        }
+
+        // Обновляем текст кнопки
+        if (port->isOpen() || ethernetConnected) {
+            ui->pbOpen->setText("Закрыть порты");
+        } else {
+            ui->pbOpen->setText("Открыть порты");
+        }
 }
 
 void MainWindow::onResponseTimeout() {
@@ -58,7 +129,7 @@ void MainWindow::onResponseTimeout() {
     stopTesting();
 }
 
-void MainWindow::on_port_ready_read() {
+void MainWindow::handleSerialData() {
     const QByteArray data = port->readAll();
     logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
 
