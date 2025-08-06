@@ -340,17 +340,17 @@ void MainWindow::result(uint8_t* packet){
                 return;
             }
         CustomDialog dialog_2(this, "Сообщение","Отправьте команду плате АЦМ","Ок","Не удалось отправить"); // Добавить фунцию
-        connect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::updateConnectionStatus);
-        udpSender->exec_cmd(um_alg_cmd::test);
-        connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){
-                logHtml(QString("CMD: %1").arg((int)cmd));
-                logHtml(QString("Status: %1").arg((int)status));
-                });
-        connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
-            logHtml(QString("Temperature: %1").arg(data->temperature));
-            logHtml(QString("Current: %1").arg(data->peltierCurrent));
-        });
-        sendTimer->start(100);
+//        connect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::updateConnectionStatus);
+//        udpSender->exec_cmd(um_alg_cmd::test);
+//        connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){
+//                logHtml(QString("Код режима работы: %1").arg((int)cmd));
+//                logHtml(QString("Код статуса: %1").arg((int)status));
+//                });
+//        connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
+//            logHtml(QString("Температура: %1").arg(data->temperature));
+//            logHtml(QString("Сила тока: %1").arg(data->peltierCurrent));
+//        });
+//        sendTimer->start(100);
         if (dialog_2.exec()) {
                 logHtml("<font color='green'>Команда плате АЦМ отправлена. Продолжение теста...</font><br>");
             } else {
@@ -442,12 +442,22 @@ void MainWindow::plotAdcData(const QByteArray& byteArray) {
 
        ui->customPlot->clearGraphs();
        ui->customPlot->addGraph();
-       ui->customPlot->graph(0)->setData(x, y);
+       //ui->customPlot->graph(0)->setData(x, y);
        ui->customPlot->xAxis->setLabel("Номер точки (сигнал лазерного диода)");
        ui->customPlot->yAxis->setLabel("Напряжение, В");
        ui->customPlot->xAxis->setRange(0, 99);
        ui->customPlot->yAxis->setRange(0, 3.3);
        ui->customPlot->replot();
+
+       ui->customPlot_2->clearGraphs();
+       ui->customPlot_2->addGraph();
+       ui->customPlot_2->graph(0)->setData(x, y);
+       ui->customPlot_2->xAxis->setLabel("Номер точки (сигнал лазерного диода)");
+       ui->customPlot_2->yAxis->setLabel("Напряжение, В");
+       ui->customPlot_2->xAxis->setRange(0, 99);
+       ui->customPlot_2->yAxis->setRange(0, 3.3);
+       ui->customPlot_2->replot();
+
        logHtml("<font color='green'>Снятно 100 точек напряжений, построен график.</font><br>");
 }
 
