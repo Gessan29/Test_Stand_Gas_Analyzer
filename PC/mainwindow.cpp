@@ -3,10 +3,15 @@
 #include <QTimer>
 #include <QVector>
 
+static const quint16 defaultSenderPort = 30000;
+static const quint16 defaultListenPort = 30001;
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , port(new QSerialPort(this))
+    , udpSender(new udp_um_sender(defaultSenderPort, this))
+    , udpReceiver(new udp_um_receiver(defaultListenPort, this))
     , sendTimer(new QTimer(this))
     , responseTimer(new QTimer(this))
 {
@@ -23,9 +28,9 @@ MainWindow::~MainWindow() {
 
 void MainWindow::setupConnections() {
     connect(sendTimer, &QTimer::timeout, this, &MainWindow::sendNextPacket);
-    connect(port, &QSerialPort::readyRead, this, &MainWindow::on_port_ready_read);
     connect(responseTimer, &QTimer::timeout, this, &MainWindow::onResponseTimeout);
     responseTimer->setSingleShot(true);
+    connect(port, &QSerialPort::readyRead, this, &MainWindow::on_port_ready_read);
 }
 
 void MainWindow::setupPort() {
@@ -33,6 +38,15 @@ void MainWindow::setupPort() {
     port->setParity(QSerialPort::NoParity);
     port->setStopBits(QSerialPort::OneStop);
     port->setFlowControl(QSerialPort::NoFlowControl);
+}
+
+void MainWindow::updateConnectionStatus(QHostAddress address){
+
+    udpSender->device_found(address);
+    logHtml("<font color ='green'>Статус: Подключено</font><br>");
+    logHtml("<font color ='green'>IP: </font><br>" + address.toString());
+    logHtml(QString("<font color ='green'>Порт отправки: %1</font><br>").arg(defaultSenderPort));
+    logHtml(QString("<font color ='green'>Порт приема: %1</font><br>").arg(defaultListenPort));
 }
 
 void MainWindow::on_pbOpen_clicked() {
@@ -326,6 +340,17 @@ void MainWindow::result(uint8_t* packet){
                 return;
             }
         CustomDialog dialog_2(this, "Сообщение","Отправьте команду плате АЦМ","Ок","Не удалось отправить"); // Добавить фунцию
+        connect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::updateConnectionStatus);
+        udpSender->exec_cmd(um_alg_cmd::test);
+        connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){
+                logHtml(QString("CMD: %1").arg((int)cmd));
+                logHtml(QString("Status: %1").arg((int)status));
+                });
+        connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
+            logHtml(QString("Temperature: %1").arg(data->temperature));
+            logHtml(QString("Current: %1").arg(data->peltierCurrent));
+        });
+        sendTimer->start(100);
         if (dialog_2.exec()) {
                 logHtml("<font color='green'>Команда плате АЦМ отправлена. Продолжение теста...</font><br>");
             } else {

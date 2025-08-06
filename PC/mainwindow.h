@@ -5,12 +5,16 @@
 #include <QSerialPort>
 #include <QSerialPortInfo>
 #include <QVector>
-
 #include <QMessageBox>
 #include <QString>
 #include <QWidget>
+
 #include "protocol_parser.h"
 #include "customdialog.h"
+#include "um_defs.h"
+#include "um_protocol_defs.h"
+#include "um_sender_udp.h"
+#include "um_receiver_udp.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -47,9 +51,12 @@ private slots:
     void closeTest();
     void logHtml(const QString& message);
     void logPlain(const QString& message);
+    void updateConnectionStatus(QHostAddress address);
 private:
     Ui::MainWindow *ui;
     QSerialPort *port;
+    udp_um_sender* udpSender;
+    udp_um_receiver* udpReceiver;
     QTimer* sendTimer; // таймер для отправки следующих пакетов через задержку
     QTimer* responseTimer; // таймер ожидания ответа от МК
     struct protocol_parser parser;
