@@ -9,6 +9,7 @@
 #include <QString>
 #include <QWidget>
 
+#include "qcustomplot.h"
 #include "protocol_parser.h"
 #include "customdialog.h"
 #include "um_defs.h"
@@ -52,6 +53,8 @@ private slots:
     void logHtml(const QString& message);
     void logPlain(const QString& message);
     void updateConnectionStatus(QHostAddress address);
+    void check_mode_acm(um_alg_cmd cmd, um_status status);
+    void on_um_vector_received(um_vector_id id, std::vector<float> vector);
 private:
     Ui::MainWindow *ui;
     QSerialPort *port;
@@ -59,6 +62,15 @@ private:
     udp_um_receiver* udpReceiver;
     QTimer* sendTimer; // таймер для отправки следующих пакетов через задержку
     QTimer* responseTimer; // таймер ожидания ответа от МК
+
+    QCPGraph* graphRef = nullptr;
+    QCPGraph* graphAnl = nullptr;
+    double xCounter = 0;   // счетчик точек
+
+    QTimer* plotTimer = nullptr; // таймер для replot()
+
+    bool ethernetConnected = false; // флаг соединения Ethernet
+
     struct protocol_parser parser;
     QVector<QVector<uint8_t>> testPackets;
     int currentPacketIndex = 0; //индекс текущего пакета в очереди

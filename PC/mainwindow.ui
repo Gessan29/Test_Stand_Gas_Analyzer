@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1051</width>
-    <height>584</height>
+    <width>946</width>
+    <height>572</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,21 +15,6 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
-    <item row="2" column="0" colspan="4">
-     <widget class="QPushButton" name="pushButton">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>10</pointsize>
-       </font>
-      </property>
-      <property name="text">
-       <string>Начать тестирование</string>
-      </property>
-     </widget>
-    </item>
     <item row="0" column="0">
      <widget class="QPushButton" name="pbOpen">
       <property name="font">
@@ -122,14 +107,34 @@
         <widget class="QLabel" name="label">
          <property name="geometry">
           <rect>
-           <x>160</x>
+           <x>260</x>
            <y>0</y>
-           <width>241</width>
-           <height>20</height>
+           <width>141</width>
+           <height>16</height>
           </rect>
          </property>
+         <property name="styleSheet">
+          <string notr="true">color:rgb(0, 0, 255)
+</string>
+         </property>
          <property name="text">
-          <string>Выставленный сигнал (идиализированный) </string>
+          <string>Аналитический канал</string>
+         </property>
+        </widget>
+        <widget class="QLabel" name="label_2">
+         <property name="geometry">
+          <rect>
+           <x>90</x>
+           <y>0</y>
+           <width>131</width>
+           <height>16</height>
+          </rect>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">color:red</string>
+         </property>
+         <property name="text">
+          <string>Опорный канал</string>
          </property>
         </widget>
        </widget>
@@ -137,21 +142,36 @@
         <property name="enabled">
          <bool>true</bool>
         </property>
-        <widget class="QLabel" name="label_2">
+        <widget class="QLabel" name="label_3">
          <property name="geometry">
           <rect>
-           <x>220</x>
+           <x>170</x>
            <y>0</y>
            <width>121</width>
            <height>20</height>
           </rect>
          </property>
          <property name="text">
-          <string>Полученный сигнал</string>
+          <string>Снятый канал лазера</string>
          </property>
         </widget>
        </widget>
       </widget>
+     </widget>
+    </item>
+    <item row="2" column="0" colspan="4">
+     <widget class="QPushButton" name="pushButton">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>10</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Начать тестирование</string>
+      </property>
      </widget>
     </item>
    </layout>
@@ -161,7 +181,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1051</width>
+     <width>946</width>
      <height>21</height>
     </rect>
    </property>

@@ -3,8 +3,10 @@
 #include <QTimer>
 #include <QVector>
 
+
 static const quint16 defaultSenderPort = 30000;
 static const quint16 defaultListenPort = 30001;
+bool index = true;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -19,6 +21,32 @@ MainWindow::MainWindow(QWidget *parent)
     setupPort();
     setupConnections();
     parser.state = protocol_parser::STATE_SYNC;
+
+
+    // Настройка графиков
+    graphRef = ui->customPlot->addGraph();
+    graphRef->setPen(QPen(Qt::red));
+    graphRef->setName("nrm_ref");
+
+    graphAnl = ui->customPlot->addGraph();
+    graphAnl->setPen(QPen(Qt::blue));
+    graphAnl->setName("nrm_anl");
+
+    // Включим легенду
+    //ui->customPlot->legend->setVisible(true);
+
+    // Настроим оси
+    ui->customPlot->xAxis->setLabel("Время");
+    ui->customPlot->yAxis->setLabel("Напряжение");
+
+    // Таймер для перерисовки
+    plotTimer = new QTimer(this);
+    connect(plotTimer, &QTimer::timeout, this, [this]() {
+        ui->customPlot->replot();
+    });
+    plotTimer->start(50); // обновление каждые 50 мс
+
+
 }
 
 MainWindow::~MainWindow() {
@@ -30,7 +58,8 @@ void MainWindow::setupConnections() {
     connect(sendTimer, &QTimer::timeout, this, &MainWindow::sendNextPacket);
     connect(responseTimer, &QTimer::timeout, this, &MainWindow::onResponseTimeout);
     responseTimer->setSingleShot(true);
-    connect(port, &QSerialPort::readyRead, this, &MainWindow::on_port_ready_read);
+    connect(port, &QSerialPort::readyRead, this, &MainWindow::on_port_ready_read);    
+    connect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::updateConnectionStatus);
 }
 
 void MainWindow::setupPort() {
@@ -43,9 +72,10 @@ void MainWindow::setupPort() {
 void MainWindow::updateConnectionStatus(QHostAddress address){
 
     udpSender->device_found(address);
-    logHtml("<font color ='green'>Статус: Подключено</font><br>");
-    logHtml("<font color ='green'>IP: </font><br>" + address.toString());
-    logHtml(QString("<font color ='green'>Порт отправки: %1</font><br>").arg(defaultSenderPort));
+    ethernetConnected = true;
+    logHtml("<font color ='green'>Тестируемая плата АЦМ подключена:</font>");
+    logHtml("<font color ='green'>IP устройства: </font>" + address.toString());
+    logHtml(QString("<font color ='green'>Порт отправки: %1</font>").arg(defaultSenderPort));
     logHtml(QString("<font color ='green'>Порт приема: %1</font><br>").arg(defaultListenPort));
 }
 
@@ -62,6 +92,7 @@ void MainWindow::on_pbOpen_clicked() {
     if (port->open(QIODevice::ReadWrite)) {
         ui->pbOpen->setText("Закрыть порт");
         logHtml("<font color='green'>Порт открыт!</font><br>");
+        udpSender->send_search_packet();
     } else {
         logHtml("<font color='red'>Ошибка открытия порта!</font><br>");
     }
@@ -104,6 +135,14 @@ void MainWindow::logPlain(const QString& message) {
 
 void MainWindow::startTesting()
 {
+    if (!ethernetConnected) {
+            logHtml("<font color='red'>Ошибка: нет подключения по Ethernet!</font>");
+            logHtml("<font color='red'>Подключите кабель Ethernet и повторите попытку</font><br>");
+            isTesting = false;
+            ui->pushButton->setText("Начать тестирование");
+            return;
+        }
+
     currentPacketIndex = 0;
     testPackets = {
         {0x01, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x01, 0x07, 0x00, 0x00, 0x00, 0x00}, {0x01, 0x03, 0x00, 0x00, 0x00, 0x00},
@@ -148,6 +187,13 @@ void MainWindow::sendNextPacket()
         stopTesting();
         return;
     }
+        index = false;
+        if(!index){
+           ethernetConnected = false;
+           sendTimer->stop();
+           udpSender->exec_cmd(um_alg_cmd::stop);
+        }
+
      const QVector<uint8_t>& packetData = testPackets[currentPacketIndex++];
      ui->plainTextEdit->appendPlainText(description(packetData));
      transfer packet(packetData);
@@ -339,28 +385,21 @@ void MainWindow::result(uint8_t* packet){
                 closeTest();
                 return;
             }
-        CustomDialog dialog_2(this, "Сообщение","Отправьте команду плате АЦМ","Ок","Не удалось отправить"); // Добавить фунцию
-//        connect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::updateConnectionStatus);
-//        udpSender->exec_cmd(um_alg_cmd::test);
-//        connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){
-//                logHtml(QString("Код режима работы: %1").arg((int)cmd));
-//                logHtml(QString("Код статуса: %1").arg((int)status));
-//                });
-//        connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
-//            logHtml(QString("Температура: %1").arg(data->temperature));
-//            logHtml(QString("Сила тока: %1").arg(data->peltierCurrent));
-//        });
-//        sendTimer->start(100);
-        if (dialog_2.exec()) {
-                logHtml("<font color='green'>Команда плате АЦМ отправлена. Продолжение теста...</font><br>");
-            } else {
-                logHtml("<font color='red'>Команда плате АЦМ не отправлена.</font><br>");
-                closeTest();
-                return;
-            }
-        return; }
+
+          udpSender->exec_cmd(um_alg_cmd::test);
+          connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){
+                  check_mode_acm(cmd, status); });
+
+          connect(udpReceiver, &udp_um_receiver::vector_received, this, &MainWindow::on_um_vector_received);
+
+          connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
+              logHtml(QString("Температура: %1").arg(data->temperature));
+              logHtml(QString("Сила тока: %1").arg(data->peltierCurrent));
+          });
+          sendTimer->start(100);
+          }
     case 25:
-        peltie(0,3); // выставить правильно погрешностьs
+        peltie(0,3); // выставить правильно погрешность
         return;
 
     case 26: {
@@ -419,6 +458,69 @@ void MainWindow::result(uint8_t* packet){
         closeTest();
         return;
     }
+}
+
+void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vector){
+    // конвертируем std::vector<float> в QVector<double>
+        QVector<double> y(vector.size());
+        for (int i = 0; i < (int)vector.size(); ++i) {
+            y[i] = static_cast<double>(vector[i]);
+        }
+
+        QVector<double> x(vector.size());
+        for (int i = 0; i < (int)vector.size(); ++i) {
+            x[i] = xCounter++;
+        }
+
+        switch(id)
+        {
+            case um_vector_id::nrm_ref:
+                if (graphRef) graphRef->addData(x, y);
+                break;
+            case um_vector_id::nrm_anl:
+                if (graphAnl) graphAnl->addData(x, y);
+                break;
+            default:
+                break;
+        }
+
+        // Ограничим размер данных, чтобы не рос бесконечно
+        const int maxPoints = 5000;
+
+        if (graphRef && graphRef->data()->size() > maxPoints) {
+            double firstKey = graphRef->data()->firstKey();
+            graphRef->data()->remove(firstKey); // удаляем старейшую точку
+        }
+
+        if (graphAnl && graphAnl->data()->size() > maxPoints) {
+            double firstKey = graphAnl->data()->firstKey();
+            graphAnl->data()->remove(firstKey); // удаляем старейшую точку
+        }
+
+        // Авто-масштаб по Y
+        ui->customPlot->rescaleAxes();
+}
+
+void MainWindow::check_mode_acm(um_alg_cmd cmd, um_status status){
+        switch((int)status){
+        case 0:
+            if((int)cmd == 1)
+            logHtml("<font color='green'>Режим тестирования платы АЦМ отключен.</font><br>");
+
+            if((int)cmd == 2)
+            logHtml("<font color='green'>На тестируемой плате установлен режим тестирования.</font><br>");
+
+            return;
+        case 1:
+            logHtml("<font color='red'>Некорректное состояние тестируемой платы.</font><br>");
+            closeTest();
+        case 3:
+            logHtml("<font color='red'>При выполнении возникла внутренняя ошибка тестовой платы!</font><br>");
+            closeTest();
+        case 4:
+            logHtml("<font color='red'>Bad request, формат запроса некорректен.</font><br>");
+            closeTest();
+        }
 }
 
 void MainWindow::plotAdcData(const QByteArray& byteArray) {

@@ -223,11 +223,11 @@ inline constexpr uint8_t  um_corr_delta_range_step = 1;
 
 struct um_laser_waveform
 {
-    float zeroLevel;
-    float beginLevel;
-    float endLevel;
-    uint16_t beginTime;
-    uint16_t endTime;
+    float zeroLevel;    // 0.0
+    float beginLevel;   // 120
+    float endLevel;     // 240
+    uint16_t beginTime; // 0
+    uint16_t endTime;   // 150
 };
 
 struct um_leak_level_param
@@ -267,12 +267,12 @@ inline constexpr auto um_calc_mode_amount = static_cast<size_t>(um_calc_mode::__
 
 struct um_regulator_param
 {
-    float    kp              ; ///< Пропорциональный коэффициент регулятора
-    float    ki              ; ///< Интегральный коэффициент регулятора
-    float    maxSetDiff      ; ///< Максимальная разница уставки и текущего значения параметра, используемой при расчете управляющего напряжения
-    float    lineToTempCoef  ; ///< Коэффициент преобразования отклонения линии в отклонения температуры
-    float    switchToLineThr ; ///< Значение отклонения линии, при котором происходит переключение со стабилизации по температуре на стабилизацию по линии
-    float    lineStableThr   ; ///< Значение отклонения линии, при достижении которого считается, что стабилизация завершена
+    float    kp              ; //  0.1  ///< Пропорциональный коэффициент регулятора
+    float    ki              ; //  0    ///< Интегральный коэффициент регулятора
+    float    maxSetDiff      ; //  1   ///< Максимальная разница уставки и текущего значения параметра, используемой при расчете управляющего напряжения
+    float    lineToTempCoef  ; //  20  ///< Коэффициент преобразования отклонения линии в отклонения температуры
+    float    switchToLineThr ; //  15  ///< Значение отклонения линии, при котором происходит переключение со стабилизации по температуре на стабилизацию по линии
+    float    lineStableThr   ; //  0.1 ///< Значение отклонения линии, при достижении которого считается, что стабилизация завершена
 };
 
 enum class um_pulse_filter_criteria
@@ -350,10 +350,10 @@ enum class um_test_mode_control : uint8_t
 struct um_test_mode_settings
 {
     um_laser_waveform laserWfm;
-    float workTemp;
-    float workLine;
+    float workTemp; // 25
+    float workLine; // 90
     um_regulator_param regParam;
-    um_test_mode_control control;
+    um_test_mode_control control;   // only_temperatureы
 };
 
 struct um_laser_settings

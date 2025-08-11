@@ -15,14 +15,14 @@ public:
     // Внутренние
     void set_port(quint16 port);
     void device_found(QHostAddress address);
-
+    void send_search_packet();
 private:
     QUdpSocket * socket;
     QHostAddress deviceIP;
     uint16_t senderPort;
     QByteArray dataToSend;
 
-    void send_search_packet();
+
 
 protected:
     virtual void send_packet(const QByteArray & arr) override;
