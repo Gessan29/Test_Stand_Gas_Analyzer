@@ -353,7 +353,7 @@ struct um_test_mode_settings
     float workTemp; // 25
     float workLine; // 90
     um_regulator_param regParam;
-    um_test_mode_control control;   // only_temperatureы
+    um_test_mode_control control;   // only_temperature
 };
 
 struct um_laser_settings

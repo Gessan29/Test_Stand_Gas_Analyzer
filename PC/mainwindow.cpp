@@ -3,7 +3,6 @@
 #include <QTimer>
 #include <QVector>
 
-
 static const quint16 defaultSenderPort = 30000;
 static const quint16 defaultListenPort = 30001;
 bool index = true;
@@ -16,37 +15,22 @@ MainWindow::MainWindow(QWidget *parent)
     , udpReceiver(new udp_um_receiver(defaultListenPort, this))
     , sendTimer(new QTimer(this))
     , responseTimer(new QTimer(this))
+    , outputTimer(new QTimer(this))
 {
     ui->setupUi(this);
     setupPort();
     setupConnections();
     parser.state = protocol_parser::STATE_SYNC;
 
-
-    // Настройка графиков
-    graphRef = ui->customPlot->addGraph();
-    graphRef->setPen(QPen(Qt::red));
-    graphRef->setName("nrm_ref");
-
-    graphAnl = ui->customPlot->addGraph();
-    graphAnl->setPen(QPen(Qt::blue));
-    graphAnl->setName("nrm_anl");
-
-    // Включим легенду
-    //ui->customPlot->legend->setVisible(true);
-
-    // Настроим оси
-    ui->customPlot->xAxis->setLabel("Время");
-    ui->customPlot->yAxis->setLabel("Напряжение");
+    auto plots = setupMainPlot(ui->customPlot);
+    graphRef = plots.graphRef;
+    graphAnl = plots.graphAnl;
 
     // Таймер для перерисовки
     plotTimer = new QTimer(this);
     connect(plotTimer, &QTimer::timeout, this, [this]() {
-        ui->customPlot->replot();
-    });
-    plotTimer->start(50); // обновление каждые 50 мс
-
-
+        ui->customPlot->replot(); });
+    plotTimer->start(200);
 }
 
 MainWindow::~MainWindow() {
@@ -191,7 +175,7 @@ void MainWindow::sendNextPacket()
         if(!index){
            ethernetConnected = false;
            sendTimer->stop();
-           udpSender->exec_cmd(um_alg_cmd::stop);
+           //udpSender->exec_cmd(um_alg_cmd::stop);
         }
 
      const QVector<uint8_t>& packetData = testPackets[currentPacketIndex++];
@@ -375,8 +359,10 @@ void MainWindow::result(uint8_t* packet){
         return;
     case 24:{
         handleCaseCommon(0, "Контрольная точка +2.048 В (VrefDAC)");
+
         sendTimer->stop();
         responseTimer->stop();
+
         CustomDialog dialog_1(this,"Выполните условие", "Прошейте МК и ПЛИС","Ок","Не удалось прошить"); // Добавить фунцию
         if (dialog_1.exec()) {
                 logHtml("<font color='green'>МК и ПЛИС прошиты. Продолжение теста...</font><br>");
@@ -389,20 +375,39 @@ void MainWindow::result(uint8_t* packet){
           udpSender->exec_cmd(um_alg_cmd::test);
           connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){
                   check_mode_acm(cmd, status); });
+          connect(udpReceiver, &udp_um_receiver::vector_received,this, &MainWindow::on_um_vector_received,Qt::UniqueConnection);
 
-          connect(udpReceiver, &udp_um_receiver::vector_received, this, &MainWindow::on_um_vector_received);
-
-          connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
-              logHtml(QString("Температура: %1").arg(data->temperature));
-              logHtml(QString("Сила тока: %1").arg(data->peltierCurrent));
-          });
-          sendTimer->start(100);
+          startAveragingMeasurements();
           }
     case 25:
         peltie(0,3); // выставить правильно погрешность
+
+        udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
+                .laserWfm = {
+                    .zeroLevel  = 0.0,
+                    .beginLevel = 120,
+                    .endLevel   = 0,
+                    .beginTime  = 0,
+                    .endTime    = 150
+                },
+                .workTemp = 25,
+                .workLine = 90,
+                .regParam = {
+                    .kp               = 0.1,
+                    .ki               = 0,
+                    .maxSetDiff       = 1,
+                    .lineToTempCoef   = 20,
+                    .switchToLineThr  = 15,
+                    .lineStableThr    = 0.1
+                },
+                .control = um_test_mode_control::only_temperature
+            })
+        );
         return;
 
     case 26: {
+        sendTimer->stop();
+        responseTimer->stop();
         CustomDialog dialog_3(this, "Установка параметров","Установите форму тока лазера","Ок","Не удалось установить параметры"); // Добавить фунцию
         if (dialog_3.exec()) {
                 logHtml("<font color='green'>Форма тока лазера установлена. Продолжение теста...</font>");
@@ -412,20 +417,44 @@ void MainWindow::result(uint8_t* packet){
                 return;
             }
         QByteArray rawData(reinterpret_cast<const char*>(parser.buffer), parser.buffer_length);
-        plotAdcData(rawData);
+        if (parser.buffer_length < 201) {
+            logHtml("<font color='red'>Недостаточно данных для построения графика</font><br>");
+            return; }
+        plotAdcData(ui->customPlot_2, rawData);
+        logHtml("<font color='green'>Снято 100 точек напряжений, построен график.</font><br>");
         return; }
+
     case 27: {
-        for (int i = 0; i < 4; i++){
-        std::vector<int> temperatures = {28, 22, 55, -5};
-        if (i < temperatures.size()) {
-               int targetTemp = temperatures[i];
-               logHtml(QString("Установить температуру %1 градусов:</font>").arg(targetTemp)); // Добавить фунцию
-               logHtml(QString("<font color='green'>Температура %1 градусов установлена</font>").arg(targetTemp));
+        std::vector<int> temperatures = {28, 22, 55, -5, 25};
+        for (int i = 0; i < 5; i++){
+               logHtml(QString("Установить температуру %1 градусов:</font>").arg(temperatures[i]));
+               udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
+                       .laserWfm = {
+                           .zeroLevel  = 0.0,
+                           .beginLevel = 120,
+                           .endLevel   = 0,
+                           .beginTime  = 0,
+                           .endTime    = 150
+                       },
+                       .workTemp = (float)temperatures[i],
+                       .workLine = 90,
+                       .regParam = {
+                           .kp               = 0.1,
+                           .ki               = 0,
+                           .maxSetDiff       = 1,
+                           .lineToTempCoef   = 20,
+                           .switchToLineThr  = 15,
+                           .lineStableThr    = 0.1
+                       },
+                       .control = um_test_mode_control::only_temperature
+                   })
+               );
+               startAveragingMeasurements();
+               logHtml(QString("<font color='green'>Температура %1 градусов установлена</font>").arg(temperatures[i]));
                peltie(0,3); // выставить правильно погрешность
-           }
          }
-        logHtml("Установить температуру 25 градусов:</font>"); // Добавить фунцию
-        logHtml("<font color='green'>Температура 25 градусов установлена</font><br>");
+        //logHtml("Установить температуру 25 градусов:</font>"); // Добавить фунцию
+        //logHtml("<font color='green'>Температура 25 градусов установлена</font><br>");
         return; }
     case 28:
         logHtml("<font color='green'>Тестирование RS-232 успешно пройдено</font><br>");
@@ -460,45 +489,90 @@ void MainWindow::result(uint8_t* packet){
     }
 }
 
-void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vector){
-    // конвертируем std::vector<float> в QVector<double>
-        QVector<double> y(vector.size());
-        for (int i = 0; i < (int)vector.size(); ++i) {
-            y[i] = static_cast<double>(vector[i]);
-        }
+void MainWindow::startAveragingMeasurements()
+{
+    measurementCount = 0;
+    sumTemperature = 0.0;
+    sumPeltierCurrent = 0.0;
+    averagingInProgress = true;
 
-        QVector<double> x(vector.size());
-        for (int i = 0; i < (int)vector.size(); ++i) {
-            x[i] = xCounter++;
-        }
+    if (sendTimer && sendTimer->isActive()) sendTimer->stop();
 
-        switch(id)
-        {
-            case um_vector_id::nrm_ref:
-                if (graphRef) graphRef->addData(x, y);
-                break;
-            case um_vector_id::nrm_anl:
-                if (graphAnl) graphAnl->addData(x, y);
-                break;
-            default:
-                break;
-        }
+    connect(udpReceiver, &udp_um_receiver::data_ready, this,
+            [this](std::shared_ptr<um_data> data) {
+                if (!averagingInProgress) return;
 
-        // Ограничим размер данных, чтобы не рос бесконечно
-        const int maxPoints = 5000;
+                sumTemperature += data->temperature;
+                sumPeltierCurrent += data->peltierCurrent;
+                measurementCount++;
 
-        if (graphRef && graphRef->data()->size() > maxPoints) {
-            double firstKey = graphRef->data()->firstKey();
-            graphRef->data()->remove(firstKey); // удаляем старейшую точку
-        }
+                if (measurementCount >= requiredMeasurements) {
+                    averagingInProgress = false;
+                    averagingloop.quit();
+                }
+            },
+            Qt::UniqueConnection);
 
-        if (graphAnl && graphAnl->data()->size() > maxPoints) {
-            double firstKey = graphAnl->data()->firstKey();
-            graphAnl->data()->remove(firstKey); // удаляем старейшую точку
-        }
+                averagingloop.exec();
+                disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
 
-        // Авто-масштаб по Y
-        ui->customPlot->rescaleAxes();
+                processAveragedResults();
+}
+
+void MainWindow::processAveragedResults()
+{
+    double avgTemp = sumTemperature / measurementCount;
+    double avgCurrent = sumPeltierCurrent / measurementCount;
+
+    logHtml(QString("<font color='blue'>Температура: %1 °C</font>").arg(avgTemp));
+    logHtml(QString("<font color='blue'>Ток: %1 мА</font>").arg(avgCurrent));
+
+    double minTemp = 24.0;
+    double maxTemp = 26.0;
+
+    if (avgTemp >= minTemp && avgTemp <= maxTemp) {
+        logHtml("<font color='green'>Температура в допустимом диапазоне. Продолжаем тест...</font><br>");
+        if (sendTimer) sendTimer->start(100);
+    } else {
+        logHtml("<font color='red'>Температура вне допустимого диапазона! Тест остановлен.</font><br>");
+        closeTest();
+    }
+}
+
+void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vector)
+{
+    static double timeCounter = 0.0;
+    const double dt = 0.01;           // 10 мс между точками
+    const int maxPoints = 5000;
+
+    QVector<double> x(vector.size()), y(vector.size());
+    for (int i = 0; i < (int)vector.size(); ++i) {
+        x[i] = timeCounter;
+        y[i] = static_cast<double>(vector[i]);
+        timeCounter += dt;
+    }
+
+    switch (id) {
+        case um_vector_id::nrm_ref:
+            if (graphRef) {
+                graphRef->addData(x, y);
+                graphRef->removeDataBefore(timeCounter - maxPoints * dt);
+            }
+            break;
+
+        case um_vector_id::nrm_anl:
+            if (graphAnl) {
+                graphAnl->addData(x, y);
+                graphAnl->removeDataBefore(timeCounter - maxPoints * dt);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    ui->customPlot->rescaleAxes();
+    ui->customPlot->xAxis->setRange(timeCounter - maxPoints * dt, timeCounter);
 }
 
 void MainWindow::check_mode_acm(um_alg_cmd cmd, um_status status){
@@ -521,46 +595,6 @@ void MainWindow::check_mode_acm(um_alg_cmd cmd, um_status status){
             logHtml("<font color='red'>Bad request, формат запроса некорректен.</font><br>");
             closeTest();
         }
-}
-
-void MainWindow::plotAdcData(const QByteArray& byteArray) {
-    if (byteArray.size() < 201) {
-        logHtml("<font color='red'>Недостаточно данных для построения графика</font><br>");
-        return;
-    }
-    QVector<double> x(100), y(100);
-    int dataStartIndex = 1;
-
-    for (int i = 0; i < 100; ++i) {
-           int index = dataStartIndex + i * 2;
-           if (index + 1 >= byteArray.size()) break;
-
-           uint8_t low = static_cast<uint8_t>(byteArray[index]);
-           uint8_t high = static_cast<uint8_t>(byteArray[index + 1]);
-           uint16_t value = (high << 8) | low;
-           x[i] = i;
-           y[i] = static_cast<double>(value) / 1000;
-       }
-
-       ui->customPlot->clearGraphs();
-       ui->customPlot->addGraph();
-       //ui->customPlot->graph(0)->setData(x, y);
-       ui->customPlot->xAxis->setLabel("Номер точки (сигнал лазерного диода)");
-       ui->customPlot->yAxis->setLabel("Напряжение, В");
-       ui->customPlot->xAxis->setRange(0, 99);
-       ui->customPlot->yAxis->setRange(0, 3.3);
-       ui->customPlot->replot();
-
-       ui->customPlot_2->clearGraphs();
-       ui->customPlot_2->addGraph();
-       ui->customPlot_2->graph(0)->setData(x, y);
-       ui->customPlot_2->xAxis->setLabel("Номер точки (сигнал лазерного диода)");
-       ui->customPlot_2->yAxis->setLabel("Напряжение, В");
-       ui->customPlot_2->xAxis->setRange(0, 99);
-       ui->customPlot_2->yAxis->setRange(0, 3.3);
-       ui->customPlot_2->replot();
-
-       logHtml("<font color='green'>Снятно 100 точек напряжений, построен график.</font><br>");
 }
 
 void MainWindow::handleCaseCommon(uint16_t sample, const QString& labelText)
@@ -636,6 +670,7 @@ void MainWindow::handleParserError()
 
 void MainWindow::stopTesting()
 {
+    udpSender->exec_cmd(um_alg_cmd::stop);
     sendTimer->stop();
     responseTimer->stop();
     testPackets.clear();

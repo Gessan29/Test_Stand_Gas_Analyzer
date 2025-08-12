@@ -11,6 +11,7 @@ CONFIG += c++17
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
+    plotsetup.cpp \
     protocol_parser.cpp \
     qcustomplot.cpp \
     uart.cpp \
@@ -24,6 +25,7 @@ HEADERS += \
     customdialog.h \
     data_logger_defs.h \
     mainwindow.h \
+    plotsetup.h \
     protocol_parser.h \
     qcustomplot.h \
     uart.h \

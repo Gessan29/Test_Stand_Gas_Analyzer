@@ -9,6 +9,7 @@
 #include <QString>
 #include <QWidget>
 
+#include "plotsetup.h"
 #include "qcustomplot.h"
 #include "protocol_parser.h"
 #include "customdialog.h"
@@ -43,8 +44,7 @@ private slots:
     void handleParsedPacket();
     void startTesting();
     void result(uint8_t* packet);
-    void handleCaseCommon(uint16_t sample, const QString& labelText);
-    void plotAdcData(const QByteArray& byteArray);
+    void handleCaseCommon(uint16_t sample, const QString& labelText);  
     void setupPort();
     void peltie(uint16_t sample, uint16_t bit);
     void setupConnections();
@@ -60,16 +60,20 @@ private:
     QSerialPort *port;
     udp_um_sender* udpSender;
     udp_um_receiver* udpReceiver;
+
     QTimer* sendTimer; // таймер для отправки следующих пакетов через задержку
     QTimer* responseTimer; // таймер ожидания ответа от МК
+    QTimer* outputTimer = nullptr; // таймер для вывода данных с АЦМ
+    QTimer* plotTimer = nullptr; // таймер для replot()
 
     QCPGraph* graphRef = nullptr;
     QCPGraph* graphAnl = nullptr;
     double xCounter = 0;   // счетчик точек
 
-    QTimer* plotTimer = nullptr; // таймер для replot()
-
     bool ethernetConnected = false; // флаг соединения Ethernet
+
+    QVector<std::shared_ptr<um_data>> dataBuffer;
+    int remainingOutputs = 0;
 
     struct protocol_parser parser;
     QVector<QVector<uint8_t>> testPackets;
@@ -77,6 +81,17 @@ private:
     bool isTesting = false; // флаг, идет ли сейчас тестирование
     bool emergencyStopTriggered = false;
     void sendPacket(uint8_t cmd, uint8_t status, uint8_t value);
+
+    int measurementCount = 0;
+    const int requiredMeasurements = 100;
+    double sumTemperature = 0.0;
+    double sumPeltierCurrent = 0.0;
+    bool averagingInProgress = true;
+    QEventLoop averagingloop;
+
+    void startAveragingMeasurements();
+    void processAveragedResults();
+
 
 };
 
