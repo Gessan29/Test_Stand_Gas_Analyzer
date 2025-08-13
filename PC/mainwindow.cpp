@@ -89,7 +89,7 @@ void MainWindow::onResponseTimeout() {
 
 void MainWindow::on_port_ready_read() {
     const QByteArray data = port->readAll();
-    logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
+//    logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
 
     for (const char byte : data) {
         const parser_result res = process_rx_byte(&parser, static_cast<uint8_t>(byte));
@@ -111,10 +111,6 @@ void MainWindow::on_pushButton_clicked() {
 
 void MainWindow::logHtml(const QString& message) {
     ui->plainTextEdit->appendHtml(message);
-}
-
-void MainWindow::logPlain(const QString& message) {
-    ui->plainTextEdit->appendPlainText(message);
 }
 
 void MainWindow::startTesting()
@@ -192,9 +188,9 @@ void MainWindow::sendNextPacket()
          QByteArray byteArray(reinterpret_cast<const char*>(packet.buf), packetSize);
      port->write(byteArray);
 
-     ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
-                                      .arg(currentPacketIndex)
-                                      .arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
+//     ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
+//                                      .arg(currentPacketIndex)
+//                                      .arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
 
     responseTimer->start(10000);
     sendTimer->stop();
@@ -425,9 +421,9 @@ void MainWindow::result(uint8_t* packet){
         return; }
 
     case 27: {
-        std::vector<int> temperatures = {28, 22, 55, -5, 25};
+        std::vector<float> temperatures = {28, 22, 55, -5, 25};
         for (int i = 0; i < 5; i++){
-               logHtml(QString("Установить температуру %1 градусов:</font>").arg(temperatures[i]));
+               logHtml(QString("Установить температуру %1 °C:</font>").arg(temperatures[i]));
                udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
                        .laserWfm = {
                            .zeroLevel  = 0.0,
@@ -436,7 +432,7 @@ void MainWindow::result(uint8_t* packet){
                            .beginTime  = 0,
                            .endTime    = 150
                        },
-                       .workTemp = (float)temperatures[i],
+                       .workTemp = temperatures[i],
                        .workLine = 90,
                        .regParam = {
                            .kp               = 0.1,
@@ -450,11 +446,9 @@ void MainWindow::result(uint8_t* packet){
                    })
                );
                startAveragingMeasurements();
-               logHtml(QString("<font color='green'>Температура %1 градусов установлена</font>").arg(temperatures[i]));
+
                peltie(0,3); // выставить правильно погрешность
          }
-        //logHtml("Установить температуру 25 градусов:</font>"); // Добавить фунцию
-        //logHtml("<font color='green'>Температура 25 градусов установлена</font><br>");
         return; }
     case 28:
         logHtml("<font color='green'>Тестирование RS-232 успешно пройдено</font><br>");
@@ -673,6 +667,7 @@ void MainWindow::stopTesting()
     udpSender->exec_cmd(um_alg_cmd::stop);
     sendTimer->stop();
     responseTimer->stop();
+    plotTimer->stop();
     testPackets.clear();
     isTesting = false;
     emergencyStopTriggered = false;

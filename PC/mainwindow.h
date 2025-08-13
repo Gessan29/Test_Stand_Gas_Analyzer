@@ -51,7 +51,6 @@ private slots:
     void onResponseTimeout();
     void closeTest();
     void logHtml(const QString& message);
-    void logPlain(const QString& message);
     void updateConnectionStatus(QHostAddress address);
     void check_mode_acm(um_alg_cmd cmd, um_status status);
     void on_um_vector_received(um_vector_id id, std::vector<float> vector);
