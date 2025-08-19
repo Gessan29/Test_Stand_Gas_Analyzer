@@ -74,6 +74,9 @@ private:
     QVector<std::shared_ptr<um_data>> dataBuffer;
     int remainingOutputs = 0;
 
+    std::vector<float> testTemperatures = {28, 22, 55, -5, 25};
+    int tempIndex = 0;
+
     struct protocol_parser parser;
     QVector<QVector<uint8_t>> testPackets;
     int currentPacketIndex = 0; //индекс текущего пакета в очереди
@@ -82,7 +85,7 @@ private:
     void sendPacket(uint8_t cmd, uint8_t status, uint8_t value);
 
     int measurementCount = 0;
-    const int requiredMeasurements = 100;
+    const int requiredMeasurements = 500;
     double sumTemperature = 0.0;
     double sumPeltierCurrent = 0.0;
     bool averagingInProgress = true;

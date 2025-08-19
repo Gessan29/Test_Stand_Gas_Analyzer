@@ -30,7 +30,7 @@ MainWindow::MainWindow(QWidget *parent)
     plotTimer = new QTimer(this);
     connect(plotTimer, &QTimer::timeout, this, [this]() {
         ui->customPlot->replot(); });
-    plotTimer->start(200);
+    plotTimer->start(300);
 }
 
 MainWindow::~MainWindow() {
@@ -66,7 +66,9 @@ void MainWindow::updateConnectionStatus(QHostAddress address){
 void MainWindow::on_pbOpen_clicked() {
     if (port->isOpen()) {
         port->close();
+        ethernetConnected = false;
         ui->pbOpen->setText("Открыть порт");
+        logHtml("<font color='orange'>Порт закрыт, Ethernet отключен</font><br>");
         return;
     }
 
@@ -89,7 +91,7 @@ void MainWindow::onResponseTimeout() {
 
 void MainWindow::on_port_ready_read() {
     const QByteArray data = port->readAll();
-//    logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
+    logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
 
     for (const char byte : data) {
         const parser_result res = process_rx_byte(&parser, static_cast<uint8_t>(byte));
@@ -138,7 +140,7 @@ void MainWindow::startTesting()
         //
         {0x00, 0x06},
         {0x00, 0x05},
-        {0x00, 0x06},
+        {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06},
         {0x00, 0x08},
         {0x01, 0x09, 0x0A, 0x00, 0x00, 0x00},
         /*{0x01, 0x09, 0x0B, 0x00, 0x00, 0x00}
@@ -167,12 +169,6 @@ void MainWindow::sendNextPacket()
         stopTesting();
         return;
     }
-        index = false;
-        if(!index){
-           ethernetConnected = false;
-           sendTimer->stop();
-           //udpSender->exec_cmd(um_alg_cmd::stop);
-        }
 
      const QVector<uint8_t>& packetData = testPackets[currentPacketIndex++];
      ui->plainTextEdit->appendPlainText(description(packetData));
@@ -367,13 +363,30 @@ void MainWindow::result(uint8_t* packet){
                 closeTest();
                 return;
             }
+        udpSender->exec_cmd(um_alg_cmd::test);
+        connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this,
+                [this](um_alg_cmd cmd, um_status status){
+                    check_mode_acm(cmd, status);
+                },
+                Qt::UniqueConnection);
 
-          udpSender->exec_cmd(um_alg_cmd::test);
-          connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){
-                  check_mode_acm(cmd, status); });
-          connect(udpReceiver, &udp_um_receiver::vector_received,this, &MainWindow::on_um_vector_received,Qt::UniqueConnection);
+        connect(udpReceiver, &udp_um_receiver::data_ready, this,
+                [this](std::shared_ptr<um_data> data) {
+                    double temperature = data->temperature;
+                    logHtml(QString("<font color='blue'>Температура: %1 °C</font>").arg(temperature));
 
-          startAveragingMeasurements();
+                    if (temperature >= 24.0 && temperature <= 26.0) {
+                        logHtml("<font color='green'>Температура в норме. Продолжаем тест...</font><br>");
+
+                        if (sendTimer) sendTimer->start(300);
+                    } else {
+                        logHtml("<font color='red'>Температура вне диапазона (25±1 °C)! Тест остановлен.</font><br>");
+                        closeTest();
+                    }
+
+                    disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
+                },
+                Qt::UniqueConnection);
           }
     case 25:
         peltie(0,3); // выставить правильно погрешность
@@ -402,16 +415,8 @@ void MainWindow::result(uint8_t* packet){
         return;
 
     case 26: {
-        sendTimer->stop();
-        responseTimer->stop();
-        CustomDialog dialog_3(this, "Установка параметров","Установите форму тока лазера","Ок","Не удалось установить параметры"); // Добавить фунцию
-        if (dialog_3.exec()) {
-                logHtml("<font color='green'>Форма тока лазера установлена. Продолжение теста...</font>");
-            } else {
-                logHtml("<font color='red'>Форма тока лазера не установлена.</font><br>");
-                closeTest();
-                return;
-            }
+        //sendTimer->stop();
+        //responseTimer->stop();
         QByteArray rawData(reinterpret_cast<const char*>(parser.buffer), parser.buffer_length);
         if (parser.buffer_length < 201) {
             logHtml("<font color='red'>Недостаточно данных для построения графика</font><br>");
@@ -421,9 +426,8 @@ void MainWindow::result(uint8_t* packet){
         return; }
 
     case 27: {
-        std::vector<float> temperatures = {28, 22, 55, -5, 25};
         for (int i = 0; i < 5; i++){
-               logHtml(QString("Установить температуру %1 °C:</font>").arg(temperatures[i]));
+               logHtml(QString("Установить температуру %1 °C:</font>").arg(testTemperatures[i]));
                udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
                        .laserWfm = {
                            .zeroLevel  = 0.0,
@@ -432,7 +436,7 @@ void MainWindow::result(uint8_t* packet){
                            .beginTime  = 0,
                            .endTime    = 150
                        },
-                       .workTemp = temperatures[i],
+                       .workTemp = testTemperatures[i],
                        .workLine = 90,
                        .regParam = {
                            .kp               = 0.1,
@@ -475,8 +479,8 @@ void MainWindow::result(uint8_t* packet){
         logHtml("<font color='green'>Выполнено!</font><br>");
         sendTimer->stop();
         responseTimer->stop();
-        CustomDialog dialog_4(this, "Проверка","Ожидание ответа от пользователя","Продолжить"); // Добавить фунцию
-        dialog_4.exec();
+        CustomDialog dialog_2(this, "Проверка","Ожидание ответа от пользователя","Продолжить"); // Добавить фунцию
+        dialog_2.exec();
         logHtml("<font color='green'>Тестирование успешно пройдено!</font><br>");
         closeTest();
         return;
@@ -492,9 +496,17 @@ void MainWindow::startAveragingMeasurements()
 
     if (sendTimer && sendTimer->isActive()) sendTimer->stop();
 
+    QTimer timeoutTimer;
+    timeoutTimer.setSingleShot(true);
+    connect(&timeoutTimer, &QTimer::timeout, &averagingloop, &QEventLoop::quit);
+    timeoutTimer.start(5000);
+
     connect(udpReceiver, &udp_um_receiver::data_ready, this,
             [this](std::shared_ptr<um_data> data) {
-                if (!averagingInProgress) return;
+                if (!averagingInProgress) {
+                    averagingloop.quit();
+                    return;
+                 }
 
                 sumTemperature += data->temperature;
                 sumPeltierCurrent += data->peltierCurrent;
@@ -507,26 +519,33 @@ void MainWindow::startAveragingMeasurements()
             },
             Qt::UniqueConnection);
 
-                averagingloop.exec();
-                disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
+            averagingloop.exec();
+            disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
 
-                processAveragedResults();
+            if (measurementCount > 0) {
+                    processAveragedResults();
+                } else {
+                    logHtml("<font color='red'>Нет данных для усреднения температуры!</font><br>");
+                    closeTest();
+                }
 }
 
 void MainWindow::processAveragedResults()
 {
+    if (measurementCount == 0) return;
+
     double avgTemp = sumTemperature / measurementCount;
     double avgCurrent = sumPeltierCurrent / measurementCount;
 
     logHtml(QString("<font color='blue'>Температура: %1 °C</font>").arg(avgTemp));
     logHtml(QString("<font color='blue'>Ток: %1 мА</font>").arg(avgCurrent));
 
-    double minTemp = 24.0;
-    double maxTemp = 26.0;
+    double minTemp = 23.5;
+    double maxTemp = 26.5;
 
     if (avgTemp >= minTemp && avgTemp <= maxTemp) {
         logHtml("<font color='green'>Температура в допустимом диапазоне. Продолжаем тест...</font><br>");
-        if (sendTimer) sendTimer->start(100);
+        if (sendTimer) sendTimer->start(200);
     } else {
         logHtml("<font color='red'>Температура вне допустимого диапазона! Тест остановлен.</font><br>");
         closeTest();
@@ -572,21 +591,24 @@ void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vecto
 void MainWindow::check_mode_acm(um_alg_cmd cmd, um_status status){
         switch((int)status){
         case 0:
-            if((int)cmd == 1)
-            logHtml("<font color='green'>Режим тестирования платы АЦМ отключен.</font><br>");
-
             if((int)cmd == 2)
-            logHtml("<font color='green'>На тестируемой плате установлен режим тестирования.</font><br>");
-
+            logHtml("<font color='green'>На плате АЦМ установлен режим тестирования.</font><br>");
             return;
+
         case 1:
             logHtml("<font color='red'>Некорректное состояние тестируемой платы.</font><br>");
             closeTest();
+
         case 3:
-            logHtml("<font color='red'>При выполнении возникла внутренняя ошибка тестовой платы!</font><br>");
+            logHtml("<font color='red'>При выполнении возникла внутренняя ошибка тестируемой платы!</font><br>");
             closeTest();
+
         case 4:
-            logHtml("<font color='red'>Bad request, формат запроса некорректен.</font><br>");
+            logHtml("<font color='red'>Bad request, формат запроса на плату АЦМ некорректен.</font><br>");
+            closeTest();
+
+        default:
+            logHtml("<font color='red'>Неизвестная ошибка!</font><br>");
             closeTest();
         }
 }
@@ -618,7 +640,6 @@ void MainWindow::handleParsedPacket()
             }
         case 0x01:
             logHtml("<font color='red'>Ошибка выполнения команды (код ошибки: 0x01)</font><br>");
-            result(parser.buffer);
             if (isTesting) {
                 closeTest();
                 return; }
@@ -650,7 +671,7 @@ void MainWindow::closeTest(){
 
                currentPacketIndex = 0;
                logHtml("<font color='orange'>Отключение питания...</font><br>");
-               sendTimer->start(100);
+               sendTimer->start(300);
                return;
            }
     stopTesting();
@@ -664,7 +685,9 @@ void MainWindow::handleParserError()
 
 void MainWindow::stopTesting()
 {
-    udpSender->exec_cmd(um_alg_cmd::stop);
+    averagingInProgress = false; // флаг остановки измерения температуры
+    averagingloop.quit();
+    udpSender->exec_cmd(um_alg_cmd::stop); // остановка режима тестирования платы АЦМ
     sendTimer->stop();
     responseTimer->stop();
     plotTimer->stop();
@@ -673,6 +696,7 @@ void MainWindow::stopTesting()
     emergencyStopTriggered = false;
     currentPacketIndex = 0;
     ui->pushButton->setText("Начать тестирование");
+    logHtml("<font color='green'>Режим тестирования платы АЦМ отключен.</font><br>");
     logHtml("<font color='orange'><br>Тестирование завершено</font><br>");
 }
 
