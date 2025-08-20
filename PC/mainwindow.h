@@ -54,6 +54,7 @@ private slots:
     void updateConnectionStatus(QHostAddress address);
     void check_mode_acm(um_alg_cmd cmd, um_status status);
     void on_um_vector_received(um_vector_id id, std::vector<float> vector);
+    void test_temp(float temp);
 private:
     Ui::MainWindow *ui;
     QSerialPort *port;
@@ -74,15 +75,14 @@ private:
     QVector<std::shared_ptr<um_data>> dataBuffer;
     int remainingOutputs = 0;
 
-    std::vector<float> testTemperatures = {28, 22, 55, -5, 25};
-    int tempIndex = 0;
-
     struct protocol_parser parser;
     QVector<QVector<uint8_t>> testPackets;
     int currentPacketIndex = 0; //индекс текущего пакета в очереди
     bool isTesting = false; // флаг, идет ли сейчас тестирование
     bool emergencyStopTriggered = false;
     void sendPacket(uint8_t cmd, uint8_t status, uint8_t value);
+
+    bool acmModePrinted = false;
 
     int measurementCount = 0;
     const int requiredMeasurements = 500;

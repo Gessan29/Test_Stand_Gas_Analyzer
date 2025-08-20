@@ -650,7 +650,7 @@ void uart_tx_rx(UART_HandleTypeDef* uart, uint8_t* buf, uint8_t* tx, uint8_t* rx
 	if (HAL_UART_Transmit(uart, tx, size, TIMEOUT_RX) != HAL_OK) {
  80006c2:	69bb      	ldr	r3, [r7, #24]
  80006c4:	b29a      	uxth	r2, r3
- 80006c6:	f242 3328 	movw	r3, #9000	@ 0x2328
+ 80006c6:	f241 3388 	movw	r3, #5000	@ 0x1388
  80006ca:	6879      	ldr	r1, [r7, #4]
  80006cc:	68f8      	ldr	r0, [r7, #12]
  80006ce:	f002 fe63 	bl	8003398 <HAL_UART_Transmit>
@@ -673,7 +673,7 @@ void uart_tx_rx(UART_HandleTypeDef* uart, uint8_t* buf, uint8_t* tx, uint8_t* rx
 			 if (HAL_UART_Receive(uart, rx, size, TIMEOUT_RX) != HAL_OK) {
  80006ec:	69bb      	ldr	r3, [r7, #24]
  80006ee:	b29a      	uxth	r2, r3
- 80006f0:	f242 3328 	movw	r3, #9000	@ 0x2328
+ 80006f0:	f241 3388 	movw	r3, #5000	@ 0x1388
  80006f4:	6839      	ldr	r1, [r7, #0]
  80006f6:	68f8      	ldr	r0, [r7, #12]
  80006f8:	f002 fed9 	bl	80034ae <HAL_UART_Receive>
@@ -694,7 +694,7 @@ void uart_tx_rx(UART_HandleTypeDef* uart, uint8_t* buf, uint8_t* tx, uint8_t* rx
 			         if (HAL_UART_Receive(uart, rx, size, TIMEOUT_RX) != HAL_OK) {
  8000710:	69bb      	ldr	r3, [r7, #24]
  8000712:	b29a      	uxth	r2, r3
- 8000714:	f242 3328 	movw	r3, #9000	@ 0x2328
+ 8000714:	f241 3388 	movw	r3, #5000	@ 0x1388
  8000718:	6839      	ldr	r1, [r7, #0]
  800071a:	68f8      	ldr	r0, [r7, #12]
  800071c:	f002 fec7 	bl	80034ae <HAL_UART_Receive>

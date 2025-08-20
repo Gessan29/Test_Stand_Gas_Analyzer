@@ -69,7 +69,7 @@
 #define RES_SHUNT_PELTIE 3000 // номинал шунтирующего резистора для тока Пельте, мОм.
 #define SAMPLES_LASER 100 // кол-во измерений сигнала лазерного диода.
 #define SAMPLES 100 // кол-во измерений контрольной точки.
-#define TIMEOUT_RX 9000 // время передачи пакета команды, мс.
+#define TIMEOUT_RX 5000 // время передачи пакета команды, мс.
 #define TIME_ADC 9000 // время измерения АЦП, мс.
 #define UART_USB huart2 // для выбора uart (выставить huart2).
 #define UART_RS_232 huart1 // для выбора uart.
