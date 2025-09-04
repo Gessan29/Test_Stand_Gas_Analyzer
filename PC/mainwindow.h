@@ -44,7 +44,7 @@ private slots:
     void handleParsedPacket();
     void startTesting();
     void result(uint8_t* packet);
-    void handleCaseCommon(uint16_t sample, const QString& labelText);  
+    void handleCaseCommon(uint16_t sample, int ratio, const QString& labelText);
     void setupPort();
     void peltie(uint16_t sample, uint16_t bit);
     void setupConnections();
@@ -94,6 +94,7 @@ private:
     void startAveragingMeasurements();
     void processAveragedResults();
 
+    bool autoScrollEnabled = true;
 
 };
 
