@@ -120,20 +120,20 @@ void test_voltage_4_point(uint8_t* buf)
 	apply_relay(GPIOB, MUX_EN);
 	switch (buf[1])
 	{
-	case CHECKPOINT_6V_NEG:
-		set_pins(1, 0, 0, 0);
+	case CHECKPOINT_5V_PW_Peltier:
+		set_pins(0, 0, 1, 1); // set_pins(1, 0, 0, 0);
 		break;
 
-	case CHECKPOINT_3_3V:
-		set_pins(0, 1, 1, 0);
+	case CHECKPOINT_5V3:
+		set_pins(0, 0, 0, 0); // set_pins(0, 1, 1, 0);
 		break;
 
-	case CHECKPOINT_5V:
-		set_pins(0, 0, 1, 1);
+	case CHECKPOINT_3V3:
+		set_pins(0, 1, 1, 0); // set_pins(0, 0, 1, 1);
 		break;
 
-	case CHECKPOINT_6V:
-		set_pins(0, 0, 0, 0);
+	case CHECKPOINT_4V_PW_Laser:
+		set_pins(0, 0, 1, 0); // set_pins(0, 0, 0, 0);
 		break;
 	default:
 		buf[0] = STATUS_INVALID_CMD;
@@ -150,39 +150,12 @@ void test_voltage_current(uint8_t* buf)
 	case SYPPLY_VOLTAGE:
 		uint32_t channel = ADC_SYPPLY_VOLTAGE;
 		test_voltage(buf, channel);
-				return;
+		return;
 
 	case SUPPLY_CURRENT:
-		    vol_average = 0;
-		    uint32_t res_shunt = RES_SHUNT_POWER; // шунтирующий резистор для измерения тока 100 mOm
-			ADC_ChannelConfTypeDef sConfig = {0};
-			sConfig.Channel = ADC_SUPPLY_CURRENT;
-			sConfig.Rank = 1;
-			sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
-			    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-			    {
-			    	buf[0] = STATUS_EXEC_ERROR;
-			    	        return;
-			    }
-
-			HAL_ADC_Start(&hadc1);
-			for (int i = 0; i < SAMPLES; i++) {
-				 while (!LL_ADC_IsActiveFlag_EOCS(ADC1)) {}
-				 	 	 LL_ADC_ClearFlag_EOCS(ADC1);
-				         vol_raw = HAL_ADC_GetValue(&hadc1);
-				         vol_average += vol_raw;
-				}
-
-			HAL_ADC_Stop(&hadc1);
-			vol_average = vol_average * REFERENCE_VOLTAGE / (ADC_BIT_RATE * SAMPLES);
-
-			tok = vol_average / res_shunt;
-			buf[1] = (uint8_t)(tok & 0xFF);
-			buf[2] = (uint8_t)(tok >> 8 & 0xFF);
-			buf[3] = (uint8_t)(tok >> 16 & 0xFF);
-			buf[4] = (uint8_t)(tok >> 24 & 0xFF);
-			buf[0] = STATUS_OK;
-			return;
+		uint32_t channel_1 = ADC_SYPPLY_VOLTAGE;
+		test_voltage(buf, channel_1);
+		return;
 
 	default:
 		buf[0] = STATUS_INVALID_CMD;
@@ -232,19 +205,19 @@ void test_voltage_11_point(uint8_t* buf)
 		set_pins(1, 1, 1, 0);
 		break;
 
-	case CHECKPOINT_GPS_5_5V:
+	case CHECKPOINT_GPS_5V:
 		set_pins(0, 0, 0, 1);
 		break;
 
-	case CHECKPOINT_VREF_ADC_4_5V:
+	case CHECKPOINT_5V_REFP:
 		set_pins(0, 1, 0, 0);
 		break;
 
-	case CHECKPOINT_5_5VA:
+	case CHECKPOINT_5VAA_sensor:
 		set_pins(0, 1, 0, 1);
 		break;
 
-	case CHECKPOINT_5_5VA_NEG:
+	case CHECKPOINT_5VAA_NEG:
 		set_pins(1, 0, 0, 1);
 		break;
 
@@ -252,15 +225,15 @@ void test_voltage_11_point(uint8_t* buf)
 		set_pins(1, 0, 1, 0);
 		break;
 
-	case CHECKPOINT_OFFSET_2_5V:
+	case CHECKPOINT_5VAA_Amq_A:
 		set_pins(1, 1, 0, 1);
 		break;
 
-	case CHECKPOINT_LASER_5V:
+	case CHECKPOINT_LASER_4V:
 		set_pins(0, 0, 1, 0);
 		break;
 
-	case CHECKPOINT_VREF_DAC_2_048V:
+	case CHECKPOINT_5V_Amq_R:
 		set_pins(1, 1, 1, 1);
 		break;
 

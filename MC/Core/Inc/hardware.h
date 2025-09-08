@@ -16,10 +16,10 @@
 #define OPEN_RELAY 1
 
 // директивы 4 контрольных точек (test_voltage_4_point):
-#define CHECKPOINT_6V_NEG 1
-#define CHECKPOINT_3_3V 2
-#define CHECKPOINT_5V 3
-#define CHECKPOINT_6V 4
+#define CHECKPOINT_5V_PW_Peltier 1
+#define CHECKPOINT_5V3 2
+#define CHECKPOINT_3V3 3
+#define CHECKPOINT_4V_PW_Laser 4
 
 // директивы измерения тока или напряжения (test_voltage_current):
 #define SYPPLY_VOLTAGE 0
@@ -29,14 +29,14 @@
 #define CHECKPOINT_1_2V 0
 #define CHECKPOINT_1_8V 1
 #define CHECKPOINT_2_5V 2
-#define CHECKPOINT_GPS_5_5V 3
-#define CHECKPOINT_VREF_ADC_4_5V 4
-#define CHECKPOINT_5_5VA 5
-#define CHECKPOINT_5_5VA_NEG 6
+#define CHECKPOINT_GPS_5V 3
+#define CHECKPOINT_5V_REFP 4
+#define CHECKPOINT_5VAA_sensor 5
+#define CHECKPOINT_5VAA_NEG 6
 #define CHECKPOINT_1_8VA 7
-#define CHECKPOINT_OFFSET_2_5V 8
-#define CHECKPOINT_LASER_5V 9
-#define CHECKPOINT_VREF_DAC_2_048V 10
+#define CHECKPOINT_5VAA_Amq_A 8
+#define CHECKPOINT_LASER_4V 9
+#define CHECKPOINT_5V_Amq_R 10
 
 //директивы настройки параметров
 
