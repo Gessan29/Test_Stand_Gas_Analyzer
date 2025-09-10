@@ -39,13 +39,13 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  17 .debug_line   0000c094  00000000  00000000  0002b283  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    000921f3  00000000  00000000  00037317  2**0
+ 18 .debug_str    000921e9  00000000  00000000  00037317  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  000c950a  2**0
+ 19 .comment      00000043  00000000  00000000  000c9500  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  00002620  00000000  00000000  000c9550  2**2
+ 20 .debug_frame  00002620  00000000  00000000  000c9544  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .debug_line_str 00000067  00000000  00000000  000cbb70  2**0
+ 21 .debug_line_str 00000067  00000000  00000000  000cbb64  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -966,8 +966,8 @@ void test_voltage_current(uint8_t* buf)
  80008a8:	e00a      	b.n	80008c0 <test_voltage_current+0x3c>
 
 	case SUPPLY_CURRENT:
-		uint32_t channel_1 = ADC_SYPPLY_VOLTAGE;
- 80008aa:	2304      	movs	r3, #4
+		uint32_t channel_1 = ADC_SUPPLY_CURRENT;
+ 80008aa:	2305      	movs	r3, #5
  80008ac:	60fb      	str	r3, [r7, #12]
 		test_voltage(buf, channel_1);
  80008ae:	68f9      	ldr	r1, [r7, #12]
@@ -1136,7 +1136,7 @@ void test_voltage_11_point(uint8_t* buf)
 		break;
  80009b4:	e03b      	b.n	8000a2e <test_voltage_11_point+0xee>
 
-	case CHECKPOINT_GPS_5_5V:
+	case CHECKPOINT_GPS_5V:
 		set_pins(0, 0, 0, 1);
  80009b6:	2301      	movs	r3, #1
  80009b8:	2200      	movs	r2, #0
@@ -1146,7 +1146,7 @@ void test_voltage_11_point(uint8_t* buf)
 		break;
  80009c2:	e034      	b.n	8000a2e <test_voltage_11_point+0xee>
 
-	case CHECKPOINT_VREF_ADC_4_5V:
+	case CHECKPOINT_5V_REFP:
 		set_pins(0, 1, 0, 0);
  80009c4:	2300      	movs	r3, #0
  80009c6:	2200      	movs	r2, #0
@@ -1156,7 +1156,7 @@ void test_voltage_11_point(uint8_t* buf)
 		break;
  80009d0:	e02d      	b.n	8000a2e <test_voltage_11_point+0xee>
 
-	case CHECKPOINT_5_5VA:
+	case CHECKPOINT_5VAA_sensor:
 		set_pins(0, 1, 0, 1);
  80009d2:	2301      	movs	r3, #1
  80009d4:	2200      	movs	r2, #0
@@ -1166,7 +1166,7 @@ void test_voltage_11_point(uint8_t* buf)
 		break;
  80009de:	e026      	b.n	8000a2e <test_voltage_11_point+0xee>
 
-	case CHECKPOINT_5_5VA_NEG:
+	case CHECKPOINT_5VAA_NEG:
 		set_pins(1, 0, 0, 1);
  80009e0:	2301      	movs	r3, #1
  80009e2:	2200      	movs	r2, #0
@@ -1186,7 +1186,7 @@ void test_voltage_11_point(uint8_t* buf)
 		break;
  80009fa:	e018      	b.n	8000a2e <test_voltage_11_point+0xee>
 
-	case CHECKPOINT_OFFSET_2_5V:
+	case CHECKPOINT_5VAA_Amq_A:
 		set_pins(1, 1, 0, 1);
  80009fc:	2301      	movs	r3, #1
  80009fe:	2200      	movs	r2, #0
@@ -1196,17 +1196,17 @@ void test_voltage_11_point(uint8_t* buf)
 		break;
  8000a08:	e011      	b.n	8000a2e <test_voltage_11_point+0xee>
 
-	case CHECKPOINT_LASER_5V:
-		set_pins(0, 0, 1, 0);
+	case CHECKPOINT_2_048_NEG:
+		set_pins(1, 0, 0, 0);
  8000a0a:	2300      	movs	r3, #0
- 8000a0c:	2201      	movs	r2, #1
+ 8000a0c:	2200      	movs	r2, #0
  8000a0e:	2100      	movs	r1, #0
- 8000a10:	2000      	movs	r0, #0
+ 8000a10:	2001      	movs	r0, #1
  8000a12:	f7ff fd7b 	bl	800050c <set_pins>
 		break;
  8000a16:	e00a      	b.n	8000a2e <test_voltage_11_point+0xee>
 
-	case CHECKPOINT_VREF_DAC_2_048V:
+	case CHECKPOINT_5V_Amq_R:
 		set_pins(1, 1, 1, 1);
  8000a18:	2301      	movs	r3, #1
  8000a1a:	2201      	movs	r2, #1

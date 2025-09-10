@@ -35,7 +35,7 @@
 #define CHECKPOINT_5VAA_NEG 6
 #define CHECKPOINT_1_8VA 7
 #define CHECKPOINT_5VAA_Amq_A 8
-#define CHECKPOINT_LASER_4V 9
+#define CHECKPOINT_2_048_NEG 9
 #define CHECKPOINT_5V_Amq_R 10
 
 //директивы настройки параметров

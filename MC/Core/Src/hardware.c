@@ -153,7 +153,7 @@ void test_voltage_current(uint8_t* buf)
 		return;
 
 	case SUPPLY_CURRENT:
-		uint32_t channel_1 = ADC_SYPPLY_VOLTAGE;
+		uint32_t channel_1 = ADC_SUPPLY_CURRENT;
 		test_voltage(buf, channel_1);
 		return;
 
@@ -229,8 +229,8 @@ void test_voltage_11_point(uint8_t* buf)
 		set_pins(1, 1, 0, 1);
 		break;
 
-	case CHECKPOINT_LASER_4V:
-		set_pins(0, 0, 1, 0);
+	case CHECKPOINT_2_048_NEG:
+		set_pins(1, 0, 0, 0);
 		break;
 
 	case CHECKPOINT_5V_Amq_R:

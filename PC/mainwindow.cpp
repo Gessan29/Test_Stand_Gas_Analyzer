@@ -142,7 +142,7 @@ void MainWindow::startTesting()
         {0x01, 0x04, 0x04, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x05, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x06, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x07, 0x00, 0x00, 0x00},
         {0x01, 0x04, 0x08, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x09, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x0A, 0x00, 0x00, 0x00},
         //
-        {0x00, 0x06}, // 25-ый
+        {0x01, 0x04, 0x0A, 0x00, 0x00, 0x00}, // 25-ый {0x00, 0x06}
         {0x00, 0x05},
         {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06},
         {0x00, 0x08}, //32-ой
@@ -203,10 +203,10 @@ QString description (const QVector<uint8_t>& packet){
         if (packet[2] == 0x01){ return "Подача напряжение питания 12В на плату:"; }
         else {return "Снять напряжение питания 12В с платы:"; }
     case 0x01:
-        if (packet[2] == 0x01){ return "Измерение напряжение контрольной точки: -6V:"; }
-        else if (packet[2] == 0x02) {return "Измерение напряжение контрольной точки: +3.3V:"; }
-        else if (packet[2] == 0x03) {return "Измерение напряжение контрольной точки: +5V:"; }
-        else if (packet[2] == 0x04) {return "Измерение напряжение контрольной точки: +6V:"; }
+        if (packet[2] == 0x01){ return "Измерение напряжение контрольной точки: 5V (PW Peltier):"; }
+        else if (packet[2] == 0x02) {return "Измерение напряжение контрольной точки: +5.3V:"; }
+        else if (packet[2] == 0x03) {return "Измерение напряжение контрольной точки: +3.3V:"; }
+        else if (packet[2] == 0x04) {return "Измерение напряжение контрольной точки: +4V (PW laser):"; }
     case 0x02:
         if (packet[2] == 0x00){ return "Измерение напряжения питания платы:"; }
         else {return "Измерение тока питания платы:"; }
@@ -222,21 +222,21 @@ QString description (const QVector<uint8_t>& packet){
         case 0x02:
             return "Измерение напряжение контрольной точки: +2.5V:";
         case 0x03:
-            return "Измерение напряжение контрольной точки: +5.5V (Power GPS):";
+            return "Измерение напряжение контрольной точки: +5V (Power GPS):";
         case 0x04:
-            return "Измерение напряжение контрольной точки: +4.5V:";
+            return "Измерение напряжение контрольной точки: +5V REFP:";
         case 0x05:
-            return "Измерение напряжение контрольной точки: +5.5V:";
+            return "Измерение напряжение контрольной точки: +5VAA sensor:";
         case 0x06:
-            return "Измерение напряжение контрольной точки: -5.5V:";
+            return "Измерение напряжение контрольной точки: -5VAA:";
         case 0x07:
-            return "Измерение напряжение контрольной точки: +1.8V:";
+            return "Измерение напряжение контрольной точки: +1.8VA:";
         case 0x08:
-            return "Измерение напряжение контрольной точки: +2.5 (Offset)V:";
+            return "Измерение напряжение контрольной точки: +5VAA (Amq_A):";
         case 0x09:
-            return "Измерение напряжение контрольной точки: +5V (Laser):";
+            return "Измерение напряжение контрольной точки: -2.048V:";
         case 0x0A:
-            return "Измерение напряжение контрольной точки: 2.048V (VrefDAC):";
+            return "Измерение напряжение контрольной точки: 5V (Amq_R):";
         }
     case 0x05:
         return "Измерение формы тока лазерного диода:";
@@ -263,9 +263,9 @@ void MainWindow::peltie(uint16_t sample, uint16_t bit){
     if (currentPacketIndex == 24)
         return;
     uint16_t volt_raw, tok;
-    volt_raw = 0; // напряжение 0 (parser.buffer[2] << 8) | parser.buffer[1];
-    tok = 0; // ток 0 (parser.buffer[3] << 16) | parser.buffer[4] << 24;
-    double volts = 0; //  volt_raw / 1000.0;
+    volt_raw = (parser.buffer[2] << 8) | parser.buffer[1]; // напряжение 0 (parser.buffer[2] << 8) | parser.buffer[1];
+    tok = (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток 0 (parser.buffer[3] << 16) | parser.buffer[4] << 24;
+    double volts = volt_raw / 1000.0;; // 0 volt_raw / 1000.0;
     if ( (volt_raw >= sample - bit && volt_raw <= sample + bit) && (tok >= sample - bit && tok <= sample + bit) ){
         logHtml(QString("<font color='green'>Измерено: %1 мА — Ток эквивалента элемента Пельтье допустим</font>").arg(tok));
         logHtml(QString("<font color='green'>Измерено: %1 В — Напряжение эквивалента элемента Пельтье допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)));
@@ -279,9 +279,8 @@ void MainWindow::peltie(uint16_t sample, uint16_t bit){
 }
 
 void MainWindow::result(uint8_t* packet){
-    uint16_t sample, tok, data, data_1;
-    double volts;
-    const uint16_t accuracy = 300;
+    uint16_t data;
+    double tok, sample;
 
     switch (currentPacketIndex){
 
@@ -295,67 +294,67 @@ void MainWindow::result(uint8_t* packet){
 
     case 5:
     case 12:
-        handleCaseCommon(2000, ratio, "Питание платы,");
+        handleCaseCommon(11.5, 0.1666, "Питание платы,");
         return;
 
     case 6:
     case 13:
-        sample = 50;
-        tok = 10;
-        data = 50; //  (parser.buffer[2] << 8) | parser.buffer[1];
-
-        if (data >= sample - tok && data <= sample + tok){
-            logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(data));
+        sample = 0.15;
+        data = (parser.buffer[2] << 8) | parser.buffer[1]; // 50 (parser.buffer[2] << 8) | parser.buffer[1];
+        tok = (double)data / 1000.0;
+        tok = tok / (0.018 * 200);
+        if (tok >= sample - 0.1 && tok <= sample + 0.1){ // 0.03
+            logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(tok));
         }
         else {
-           logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(data));
-            closeTest();
+           logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(tok));
+           closeTest();
            }
         return;
     case 7:
-        handleCaseCommon(6000, ratio, "Контрольная точка -6 В");
+        handleCaseCommon(5, ratio, "Контрольная точка 5V (PW Peltier)");
         return;
     case 8:
-        handleCaseCommon(3300, ratio, "Контрольная точка +3.3 В"); // ???
+        handleCaseCommon(5.3, ratio, "Контрольная точка +5.3V"); // ???
         return;
     case 9:
-        handleCaseCommon(5000, ratio, "Контрольная точка +5 В");
+        handleCaseCommon(3.3, ratio, "Контрольная точка +3.3V");
         return;
     case 10:
-        handleCaseCommon(6000, ratio, "Контрольная точка +6 В");
+        handleCaseCommon(4, ratio, "Контрольная точка +4.1V (PW laser)");
         return;
     case 14:
-        handleCaseCommon(1200, 1, "Контрольная точка +1.2 В");
+        handleCaseCommon(1.2, 1, "Контрольная точка +1.2V");
         return;
     case 15:
-        handleCaseCommon(1800, 1, "Контрольная точка +1.8 В");
+        handleCaseCommon(1.8, 1, "Контрольная точка +1.8V");
         return;
     case 16:
-        handleCaseCommon(2500, 1, "Контрольная точка +2.5 В");
+        handleCaseCommon(2.5, 1, "Контрольная точка +2.5V");
         return;
     case 17:
-        handleCaseCommon(5500, ratio, "Контрольная точка +5.5 В (Power GPS)");
+        handleCaseCommon(5, ratio, "Контрольная точка +5V (Power GPS)");
         return;
     case 18:
-        handleCaseCommon(4500, ratio, "Контрольная точка +4.5 В (VrefADC)");
+        //handleCaseCommon(5, ratio, "Контрольная точка +5V (REFP)");
         return;
     case 19:
-        handleCaseCommon(5500, ratio, "Контрольная точка +5.5 В");
+        handleCaseCommon(5, ratio, "Контрольная точка +5VAA (sensor)");
         return;
     case 20:
-        handleCaseCommon(5500, ratio, "Контрольная точка -5.5 В");
+        //handleCaseCommon(5, ratio, "Контрольная точка -5VAA");
         return;
     case 21:
-        handleCaseCommon(1800, 1, "Контрольная точка +1.8 В");
+        handleCaseCommon(1.8, 1, "Контрольная точка +1.8VA");
         return;
     case 22:
-        handleCaseCommon(2500, 1, "Контрольная точка +2.5 В (Offset)");
+        handleCaseCommon(5, ratio, "Контрольная точка +5VAA (Amq_A)");
         return;
     case 23:
-        handleCaseCommon(5000, ratio, "Контрольная точка +5 В (Laser)");
+        handleCaseCommon(2.048, 1, "Контрольная точка -2.048V");
         return;
     case 24:{
-        handleCaseCommon(2048, 1, "Контрольная точка +2.048 В (VrefDAC)");
+        //handleCaseCommon(5, ratio, "Контрольная точка +5VAA (Amq_R)");
 
         sendTimer->stop();
         responseTimer->stop();
@@ -422,13 +421,13 @@ void MainWindow::result(uint8_t* packet){
           }
         return;
     case 25:
-        peltie(0,3); // выставить правильно погрешность
+        //peltie(0,3); // выставить правильно погрешность
 
         udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
                 .laserWfm = {
                     .zeroLevel  = 0.0,
                     .beginLevel = 120,
-                    .endLevel   = 0,
+                    .endLevel   = 240,
                     .beginTime  = 0,
                     .endTime    = 150
                 },
@@ -529,7 +528,7 @@ void MainWindow::test_temp(float temp){
             .laserWfm = {
                 .zeroLevel  = 0.0,
                 .beginLevel = 120,
-                .endLevel   = 0,
+                .endLevel   = 240,
                 .beginTime  = 0,
                 .endTime    = 150
             },
@@ -678,14 +677,14 @@ void MainWindow::check_mode_acm(um_alg_cmd cmd, um_status status){
         }
 }
 
-void MainWindow::handleCaseCommon(uint16_t sample, int ratio, const QString& labelText)
+void MainWindow::handleCaseCommon(double sample, double ratio, const QString& labelText)
 {
-    const uint16_t accuracy = 10000; // 300
-    uint16_t data = 1000 ; // (parser.buffer[2] << 8) | parser.buffer[1];
-    double volts = data / 1000.0;
-    //volts = volts / ratio;
+    const double accuracy = 2; // 0.5
+    uint16_t data = (parser.buffer[2] << 8) | parser.buffer[1]; ; // 10000
+    double volts = (double)data / 1000.0;
+    volts = volts / ratio;
 
-    if (data >= sample - accuracy && data <= sample + accuracy) {
+    if (volts >= sample - accuracy && volts <= sample + accuracy) {
         logHtml(QString("<font color='green'>Измерено: %1 В — %2 напряжение допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)).arg(labelText));
     } else {
         logHtml(QString("<font color='red'>Измерено: %1 В — %2 напряжение превышает диапазон</font><br><br>").arg(QString::number(volts, 'f', 3)).arg(labelText));
@@ -767,6 +766,14 @@ void MainWindow::stopTesting()
     averagingloop.quit();
 
     udpSender->exec_cmd(um_alg_cmd::stop); // остановка режима тестирования платы АЦМ
+
+    // Очистка графиков
+       if (graphRef) graphRef->data()->clear();
+       if (graphAnl) graphAnl->data()->clear();
+       ui->customPlot->replot();
+
+       ui->customPlot_2->clearGraphs();
+       ui->customPlot_2->replot();
 
     // Очищаем данные
     testPackets.clear();
