@@ -274,8 +274,8 @@ void test_corrent_laser(uint8_t* buf)
 
 void test_voltage_peltie(uint8_t* buf)
 {
-	int32_t vol_raw, tok = 0, vol_average_1 = 0, vol_average_2 = 0;
-	int32_t res_shunt = RES_SHUNT_PELTIE;
+	int32_t vol_average_1 = 0, vol_average_2 = 0;
+	int16_t vol_raw, tok = 0, res_shunt = RES_SHUNT_PELTIE;
 	ADC_ChannelConfTypeDef sConfig = {0};
 
 	sConfig.Channel = ADC_PELTIE_1;
@@ -318,18 +318,26 @@ void test_voltage_peltie(uint8_t* buf)
 	HAL_ADC_Stop(&hadc1);
 	vol_average_2 = vol_average_2 * REFERENCE_VOLTAGE / (ADC_BIT_RATE * SAMPLES);
 
-	tok = vol_average_1 - vol_average_2;
-	buf[1] = (uint8_t)(tok & 0xFF);
-	buf[2] = (uint8_t)(tok >> 8 & 0xFF);
-	if (tok > 0) {
-		buf[0] = STATUS_EXEC_ERROR;
-		tok = (tok * 1000000) / res_shunt; // мкА
+	vol_average_1 = vol_average_1 - vol_average_2;
+
+	if (vol_average_1 > 0) {
+		buf[5] = 0; // напряжение положительное
 	} else {
-		buf[0] = STATUS_OK;
-		tok = (tok * 1000000) / res_shunt; // мкА
+		buf[5] = 1; // напряжение отрицательное
+		vol_average_1 = -vol_average_1;
 	}
-	buf[3] = (uint8_t)(tok >> 16 & 0xFF);
-	buf[4] = (uint8_t)(tok >> 24 & 0xFF);
+
+	buf[0] = STATUS_OK;
+
+	int16_t vol_16 = (int16_t)vol_average_1;
+
+	buf[1] = vol_16 & 0xFF;
+	buf[2] = (vol_16 >> 8) & 0xFF;
+
+	tok = (int16_t)((vol_average_1 * 1000) / res_shunt); // мА
+
+	buf[3] = tok & 0xFF;
+	buf[4] = (tok >> 8) & 0xFF;
 	return;
 }
 

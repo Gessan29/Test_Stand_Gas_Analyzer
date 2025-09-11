@@ -46,7 +46,7 @@ private slots:
     void result(uint8_t* packet);
     void handleCaseCommon(double sample, double ratio, const QString& labelText);
     void setupPort();
-    void peltie(uint16_t sample, uint16_t bit);
+    void peltie();
     void setupConnections();
     void onResponseTimeout();
     void closeTest();

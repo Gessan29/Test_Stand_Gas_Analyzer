@@ -120,13 +120,6 @@ void MainWindow::logHtml(const QString& message) {
 
 void MainWindow::startTesting()
 {
-//    if (!ethernetConnected) {
-//            logHtml("<font color='red'>Ошибка: нет подключения по Ethernet!</font>");
-//            logHtml("<font color='red'>Подключите кабель Ethernet и повторите попытку</font><br>");
-//            isTesting = false;
-//            ui->pushButton->setText("Начать тестирование");
-//            return;
-//        }
     acmModePrinted = false;
 
     currentPacketIndex = 0;
@@ -142,7 +135,7 @@ void MainWindow::startTesting()
         {0x01, 0x04, 0x04, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x05, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x06, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x07, 0x00, 0x00, 0x00},
         {0x01, 0x04, 0x08, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x09, 0x00, 0x00, 0x00}, {0x01, 0x04, 0x0A, 0x00, 0x00, 0x00},
         //
-        {0x01, 0x04, 0x0A, 0x00, 0x00, 0x00}, // 25-ый {0x00, 0x06}
+        {0x00, 0x06}, // 25-ый {0x00, 0x06}
         {0x00, 0x05},
         {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06},
         {0x00, 0x08}, //32-ой
@@ -187,9 +180,9 @@ void MainWindow::sendNextPacket()
          QByteArray byteArray(reinterpret_cast<const char*>(packet.buf), packetSize);
      port->write(byteArray);
 
-//     ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
-//                                      .arg(currentPacketIndex)
-//                                      .arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
+     ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
+                                      .arg(currentPacketIndex)
+                                      .arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
 
     responseTimer->start(10000);
     sendTimer->stop();
@@ -259,14 +252,26 @@ QString description (const QVector<uint8_t>& packet){
 }
 }
 
-void MainWindow::peltie(uint16_t sample, uint16_t bit){
+void MainWindow::peltie(){
     if (currentPacketIndex == 24)
         return;
-    uint16_t volt_raw, tok;
-    volt_raw = (parser.buffer[2] << 8) | parser.buffer[1]; // напряжение 0 (parser.buffer[2] << 8) | parser.buffer[1];
-    tok = (parser.buffer[3] << 16) | parser.buffer[4] << 24; // ток 0 (parser.buffer[3] << 16) | parser.buffer[4] << 24;
-    double volts = volt_raw / 1000.0;; // 0 volt_raw / 1000.0;
-    if ( (volt_raw >= sample - bit && volt_raw <= sample + bit) && (tok >= sample - bit && tok <= sample + bit) ){
+    int16_t volt_raw, tok_raw;
+    float sample_v = 2, bit_v = 2, sample_a = 500, bit_a = 500;
+    uint8_t znak = parser.buffer[5];
+
+    volt_raw = (((parser.buffer[2] & 0xFF) << 8) | (parser.buffer[1] & 0xFF)); // напряжение 0
+    tok_raw = (parser.buffer[3] & 0xFF) | ((parser.buffer[4] & 0xFF) << 8); // ток 0
+
+    float volts = (float)volt_raw / 1000.0;
+    int tok = (int)tok_raw;
+    if (znak == 1){
+        volts = -volts;
+        tok = -tok;
+        sample_v = -sample_v;
+        sample_a = -sample_a;
+    }
+
+    if ( (volts >= sample_v - bit_v && volts <= sample_v + bit_v) && (tok >= sample_a - bit_a && tok <= sample_a + bit_a) ){ // поменять диапазон
         logHtml(QString("<font color='green'>Измерено: %1 мА — Ток эквивалента элемента Пельтье допустим</font>").arg(tok));
         logHtml(QString("<font color='green'>Измерено: %1 В — Напряжение эквивалента элемента Пельтье допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)));
         return;
@@ -280,17 +285,27 @@ void MainWindow::peltie(uint16_t sample, uint16_t bit){
 
 void MainWindow::result(uint8_t* packet){
     uint16_t data;
-    double tok, sample;
+    float tok, sample;
 
     switch (currentPacketIndex){
 
     case 1:
     case 2:
     case 3:
-    case 4:
-    case 11:
         logHtml("<font color='green'>Выполнено!</font><br>");
         return;
+
+    case 4:
+    case 11:{
+        QEventLoop waitPW;
+        QTimer waitTimerPW;
+        waitTimerPW.setSingleShot(true);
+        connect(&waitTimerPW, &QTimer::timeout, &waitPW, &QEventLoop::quit);
+        waitTimerPW.start(2000);
+        waitPW.exec();
+        logHtml("<font color='green'>Выполнено!</font><br>");
+        return;
+    }
 
     case 5:
     case 12:
@@ -300,10 +315,10 @@ void MainWindow::result(uint8_t* packet){
     case 6:
     case 13:
         sample = 0.15;
-        data = (parser.buffer[2] << 8) | parser.buffer[1]; // 50 (parser.buffer[2] << 8) | parser.buffer[1];
-        tok = (double)data / 1000.0;
+        data = (parser.buffer[2] << 8) | parser.buffer[1];
+        tok = (float)data / 1000.0;
         tok = tok / (0.018 * 200);
-        if (tok >= sample - 0.1 && tok <= sample + 0.1){ // 0.03
+        if (tok >= sample - 0.1 && tok <= sample + 0.1){
             logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(tok));
         }
         else {
@@ -336,13 +351,13 @@ void MainWindow::result(uint8_t* packet){
         handleCaseCommon(5, ratio, "Контрольная точка +5V (Power GPS)");
         return;
     case 18:
-        //handleCaseCommon(5, ratio, "Контрольная точка +5V (REFP)");
+        //handleCaseCommon(5, ratio, "Контрольная точка +5V (REFP)"); // нет контакта
         return;
     case 19:
         handleCaseCommon(5, ratio, "Контрольная точка +5VAA (sensor)");
         return;
     case 20:
-        //handleCaseCommon(5, ratio, "Контрольная точка -5VAA");
+        handleCaseCommon(5, 0.66, "Контрольная точка -5VAA"); // кф. деления????
         return;
     case 21:
         handleCaseCommon(1.8, 1, "Контрольная точка +1.8VA");
@@ -351,10 +366,10 @@ void MainWindow::result(uint8_t* packet){
         handleCaseCommon(5, ratio, "Контрольная точка +5VAA (Amq_A)");
         return;
     case 23:
-        handleCaseCommon(2.048, 1, "Контрольная точка -2.048V");
+        handleCaseCommon(2.048, 1, "Контрольная точка -2.048V"); // не правильное напряжение
         return;
     case 24:{
-        //handleCaseCommon(5, ratio, "Контрольная точка +5VAA (Amq_R)");
+        handleCaseCommon(5, ratio, "Контрольная точка +5VAA (Amq_R)");
 
         sendTimer->stop();
         responseTimer->stop();
@@ -373,7 +388,7 @@ void MainWindow::result(uint8_t* packet){
             QTimer waitTimer;
             waitTimer.setSingleShot(true);
             connect(&waitTimer, &QTimer::timeout, &waitLoop, &QEventLoop::quit);
-            waitTimer.start(3000);
+            waitTimer.start(2000);
             waitLoop.exec();
 
             connect(udpReceiver, &udp_um_receiver::device_found,this, &MainWindow::updateConnectionStatus, Qt::UniqueConnection);
@@ -403,10 +418,10 @@ void MainWindow::result(uint8_t* packet){
         connect(udpReceiver, &udp_um_receiver::data_ready, this,
                 [this](std::shared_ptr<um_data> data) {
 
-                    double temperature = data->temperature;
+                    float temperature = data->temperature;
                     logHtml(QString("<font color='blue'>Температура: %1 °C</font>").arg(temperature));
 
-                    if (temperature >= -30.0 && temperature <= 27) { // вернуть правильную погрешность +-1.5
+                    if (temperature >= 23 && temperature <= 27) { // вернуть правильную погрешность +-1.5
                         logHtml("<font color='green'>Температура в норме.</font><br>");
 
                         if (sendTimer) sendTimer->start(300);
@@ -421,7 +436,7 @@ void MainWindow::result(uint8_t* packet){
           }
         return;
     case 25:
-        //peltie(0,3); // выставить правильно погрешность
+        peltie(); // выставить правильно погрешность
 
         udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
                 .laserWfm = {
@@ -466,26 +481,28 @@ void MainWindow::result(uint8_t* packet){
     }
 
     case 27:
-        peltie(0,3); // выставить правильно погрешность
+        peltie(); // выставить правильно погрешность
         test_temp(22);
         return;
     case 28:
-        peltie(0,3); // выставить правильно погрешность
+        peltie(); // выставить правильно погрешность
         test_temp(55);
         return;
     case 29:
-        peltie(0,3); // выставить правильно погрешность
+        peltie(); // выставить правильно погрешность
         test_temp(-5);
         return;
     case 30:
-        peltie(0,3); // выставить правильно погрешность
+        peltie(); // выставить правильно погрешность
         test_temp(25);
         return;
     case 31:
-        peltie(0,3); // выставить правильно погрешность
+        peltie(); // выставить правильно погрешность
         return;
 
     case 32:
+        sendTimer->stop();
+        responseTimer->stop();
         logHtml("<font color='green'>Тестирование RS-232 успешно пройдено</font><br>");
         return;
     case 33:
@@ -601,8 +618,8 @@ void MainWindow::processAveragedResults()
     logHtml(QString("<font color='blue'>Температура: %1 °C</font>").arg(avgTemp));
     logHtml(QString("<font color='blue'>Ток: %1 мА</font>").arg(avgCurrent));
 
-    double minTemp = 23.5;
-    double maxTemp = 26.5;
+    float minTemp = 23.0;
+    float maxTemp = 27.5;
 
     if (avgTemp >= minTemp && avgTemp <= maxTemp) {
         logHtml("<font color='green'>Температура в допустимом диапазоне.</font><br>");
@@ -700,24 +717,24 @@ void MainWindow::handleParsedPacket()
         case 0x00:
             result(parser.buffer);
             if (isTesting || emergencyStopTriggered) {
-                sendTimer->start(200);
+                sendTimer->start(300);
                 return;
             }
         case 0x01:
-            logHtml("<font color='red'>Ошибка выполнения команды (код ошибки: 0x01)</font><br>");
+            logHtml("<font color='red'>Ошибка выполнения команды (код ошибки: 01)</font><br>");
             if (isTesting) {
                 closeTest();
                 return; }
         case 0x02:
-            logHtml("<font color='red'>Несуществующая команда (код ошибки: 0x02)</font><br>");
+            logHtml("<font color='red'>Несуществующая команда (код ошибки: 02)</font><br>");
             closeTest();
             break;
         case 0x03:
-           logHtml("<font color='red'>Превышено время выполнения команды (код ошибки: 0x03)</font><br>");
+           logHtml("<font color='red'>Превышено время выполнения команды (код ошибки: 03)</font><br>");
             closeTest();
             break;
         case 0x04:
-            logHtml("<font color='red'>Ошибка размера данных команды (код ошибки: 0x04)</font><br>");
+            logHtml("<font color='red'>Ошибка размера данных команды (код ошибки: 04)</font><br>");
             closeTest();
             break;
         }
@@ -736,7 +753,7 @@ void MainWindow::closeTest(){
 
                currentPacketIndex = 0;
                logHtml("<font color='orange'>Отключение питания...</font><br>");
-               sendTimer->start(300);
+               sendTimer->start(200);
                return;
            }
     stopTesting();

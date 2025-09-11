@@ -121,7 +121,7 @@ void choose_command(uint8_t* buffer, size_t* buffer_length)
     	test_corrent_laser(buffer);
         break;
     case TEST_VOLTAGE_PELTIE:
-    	*buffer_length = 5;
+    	*buffer_length = 6;
     	test_voltage_peltie(buffer);
         break;
     case APPLY_VOLTAGE_5_RL:

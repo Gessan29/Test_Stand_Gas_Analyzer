@@ -73,7 +73,7 @@
 #define TIME_ADC 9000 // время измерения АЦП, мс.
 #define UART_USB huart2 // для выбора uart (выставить huart2).
 #define UART_RS_232 huart1 // для выбора uart.
-#define UART_GPS huart1 // для выбора uart (выставить huart6).
+#define UART_GPS huart6 // для выбора uart (выставить huart6).
 #define RS_232 7 // размер передаваемого массива функции massage_rs232.
 #define GPS_SIZE 49 // размер передаваемого массива функции massage_gps.
 
