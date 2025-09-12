@@ -63,26 +63,18 @@ void uart_tx_rx(UART_HandleTypeDef* uart, uint8_t* buf, uint8_t* tx, uint8_t* rx
 		        return;
 		    }
 		 if (uart->RxState == HAL_UART_STATE_READY) {
-			 if (HAL_UART_Receive(uart, rx, size, TIMEOUT_RX) != HAL_OK) {
+			 if (HAL_UART_Receive(uart, rx, size - 1, TIMEOUT_RX) != HAL_OK) {
 			             buf[0] = STATUS_TIMED_OUT;
 			             return;
 			         }
 			     } else {
 			         HAL_UART_AbortReceive(uart);
-			         if (HAL_UART_Receive(uart, rx, size, TIMEOUT_RX) != HAL_OK) {
+			         if (HAL_UART_Receive(uart, rx, size - 1, TIMEOUT_RX) != HAL_OK) {
 			             buf[0] = STATUS_TIMED_OUT;
 			             return;
 			         }
 			     }
-}
-
-int compare_arrays(uint8_t arr1[], uint8_t arr2[], size_t size){
-	for(int i = 0; i < size; i++){
-		if (arr1[i] != arr2[i]){
-			return 1;
-		}
-	}
-	return 0;
+		 buf[0] = STATUS_OK;
 }
 
 
@@ -368,37 +360,47 @@ void apply_voltage_relay_5(uint8_t* buf) // PC13
 
 void massage_rs232(uint8_t* buf)
 {
-	uint8_t rs_232_tx [RS_232] = "RS_232!";
-	uint8_t rs_232_rx [RS_232];
+	uint8_t rs_232_tx [10] = {0x55, 0x07, 0x00, 0x01, 0x02, 0x02, 0x00, 0x02, 0x38, 0x79};
+	uint8_t rs_232_rx [RS_232 - 1];
 	uart_tx_rx(&UART_RS_232, buf, rs_232_tx, rs_232_rx, RS_232);
 
 	if (buf[0] == STATUS_TIMED_OUT){ return; }
 
-	if (compare_arrays(rs_232_tx, rs_232_rx, RS_232) == 0){
-		buf[0] = STATUS_OK;
-	}
-	else {
-		buf[0] = STATUS_EXEC_ERROR;
-	}
-	for (int i = 1; i < 5; i++){
-		buf[i] = 0;
+	for (size_t i = 0; i < RS_232 - 1; i++){
+		buf[i + 1] = rs_232_rx[i];
 	}
 }
 
 void massage_gps(uint8_t* buf)
 {
-	uint8_t gps_tx [GPS_SIZE] = "$GNGLL,5502.49000,N,08256.07600,E,1235  .000,A,A*"; // GLL, version 4.1 and 4.2, NMEA 0183
-	uint8_t gps_rx [GPS_SIZE];
-	gps_tx[38] = (buf[1]/ 10) + '0';
-	gps_tx[39] = (buf[1] % 10) + '0';
-	uart_tx_rx(&UART_GPS, buf, gps_tx, gps_rx, GPS_SIZE);
 
-	if (buf[0] == STATUS_TIMED_OUT){ return; }
+	uint8_t gps_tx[] = "$GPRMC,125504.049,A,5542.2389,N,03741.6063,E,0.06,25.82,200906,,,*17\r\n";
+	if (HAL_UART_Transmit(&UART_GPS, gps_tx, strlen((char*)gps_tx), TIMEOUT_RX) != HAL_OK){
+		buf[0] = STATUS_TIMED_OUT;
+		return;
+	}
 
-	if (compare_arrays(gps_tx, gps_rx, GPS_SIZE) == 0){
-			buf[0] = STATUS_OK;
-		}
-		else {
-			buf[0] = STATUS_EXEC_ERROR;
-		}
+	buf[0] = STATUS_OK;
+
+	//	uint8_t gps_tx[] = {
+	//	    '$', '$','G','P','R','M','C',',',
+	//	    '1','2','5','5','0','4','.','0','4','9',',','A',',',
+	//	    '5','5','4','2','.','2','3','8','9',',','N',',',
+	//	    '0','3','7','4','1','.','6','0','6','3',',','E',',',
+	//	    '0','.','0','6',',','2','5','.','8','2',',',
+	//	    '2','0','0','9','0','6',',',',',',','*','1','7', '$', '0', 'A'
+	//	};
+
+	//uint16_t packet_len = sizeof(gps_tx);
+
+	//gps_tx[38] = (buf[1]/ 10) + '0';
+	//gps_tx[39] = (buf[1] % 10) + '0';
+	//uart_tx_rx(&UART_GPS, buf, gps_tx, gps_rx, GPS_SIZE);
+
+//	if (HAL_UART_Transmit(&UART_GPS, gps_tx, packet_len, TIMEOUT_RX) != HAL_OK) {
+//			        buf[0] = STATUS_TIMED_OUT;
+//			        return;
+//			    }
+
+
 }

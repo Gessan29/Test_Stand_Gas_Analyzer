@@ -81,7 +81,6 @@ void MainWindow::on_pbOpen_clicked() {
     if (port->open(QIODevice::ReadWrite)) {
         ui->pbOpen->setText("Закрыть порт");
         logHtml("<font color='green'>Порт открыт!</font><br>");
-       // udpSender->send_search_packet();
     } else {
         logHtml("<font color='red'>Ошибка открытия порта!</font><br>");
     }
@@ -94,7 +93,7 @@ void MainWindow::onResponseTimeout() {
 
 void MainWindow::on_port_ready_read() {
     const QByteArray data = port->readAll();
-    logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
+    //logHtml(QString("<font color='blue'>%1</font>").arg(QString::fromUtf8(data.toHex(' ').toUpper()))); // для просмотра пришедших пакетов
 
     for (const char byte : data) {
         const parser_result res = process_rx_byte(&parser, static_cast<uint8_t>(byte));
@@ -180,9 +179,9 @@ void MainWindow::sendNextPacket()
          QByteArray byteArray(reinterpret_cast<const char*>(packet.buf), packetSize);
      port->write(byteArray);
 
-     ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
-                                      .arg(currentPacketIndex)
-                                      .arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
+//     ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
+//                                      .arg(currentPacketIndex)
+//                                      .arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
 
     responseTimer->start(10000);
     sendTimer->stop();
@@ -319,10 +318,10 @@ void MainWindow::result(uint8_t* packet){
         tok = (float)data / 1000.0;
         tok = tok / (0.018 * 200);
         if (tok >= sample - 0.1 && tok <= sample + 0.1){
-            logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(tok));
+            logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(tok, 0, 'f', 3));
         }
         else {
-           logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(tok));
+           logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(tok, 0, 'f', 3));
            closeTest();
            }
         return;
@@ -330,7 +329,7 @@ void MainWindow::result(uint8_t* packet){
         handleCaseCommon(5, ratio, "Контрольная точка 5V (PW Peltier)");
         return;
     case 8:
-        handleCaseCommon(5.3, ratio, "Контрольная точка +5.3V"); // ???
+        handleCaseCommon(5.3, ratio, "Контрольная точка +5.3V");
         return;
     case 9:
         handleCaseCommon(3.3, ratio, "Контрольная точка +3.3V");
@@ -481,30 +480,34 @@ void MainWindow::result(uint8_t* packet){
     }
 
     case 27:
-        peltie(); // выставить правильно погрешность
+        peltie();
         test_temp(22);
         return;
     case 28:
-        peltie(); // выставить правильно погрешность
+        peltie();
         test_temp(55);
         return;
     case 29:
-        peltie(); // выставить правильно погрешность
+        peltie();
         test_temp(-5);
         return;
     case 30:
-        peltie(); // выставить правильно погрешность
+        peltie();
         test_temp(25);
         return;
     case 31:
-        peltie(); // выставить правильно погрешность
+        peltie();
+        udpSender->exec_cmd(um_alg_cmd::stop);
         return;
 
     case 32:
-        sendTimer->stop();
-        responseTimer->stop();
-        logHtml("<font color='green'>Тестирование RS-232 успешно пройдено</font><br>");
+        if (parser.buffer[5] == 0x01 && parser.buffer[6] == 0x02 && parser.buffer[7] == 0x02 && parser.buffer[8] == 0x00){
+            logHtml("<font color='green'>Тестирование RS-232 пройдено, сообщение получено.</font><br>");
+            return;
+        }
+        logHtml("<font color='red'>Тестирование RS-232 не пройдено!</font><br>");
         return;
+
     case 33:
     /*case 30: //еще 9 измерений для GPS не забыть вернуть, сейчас только одно
     case 31:
@@ -515,7 +518,8 @@ void MainWindow::result(uint8_t* packet){
     case 36:
     case 37:
     case 38:*/
-        sendTimer->start(1000);
+        udpSender->exec_cmd(um_alg_cmd::test);
+        sendTimer->start(3000);
         if (currentPacketIndex == 33){ // поменять на 38
         logHtml("<font color='green'>Тестирование GPS успешно пройдено</font><br>"); }
         return;
@@ -704,7 +708,7 @@ void MainWindow::handleCaseCommon(double sample, double ratio, const QString& la
     if (volts >= sample - accuracy && volts <= sample + accuracy) {
         logHtml(QString("<font color='green'>Измерено: %1 В — %2 напряжение допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)).arg(labelText));
     } else {
-        logHtml(QString("<font color='red'>Измерено: %1 В — %2 напряжение превышает диапазон</font><br><br>").arg(QString::number(volts, 'f', 3)).arg(labelText));
+        logHtml(QString("<font color='red'>Измерено: %1 В — %2 напряжение вне допустимого диапазона</font><br><br>").arg(QString::number(volts, 'f', 3)).arg(labelText));
         closeTest();
     }
 }
@@ -735,6 +739,10 @@ void MainWindow::handleParsedPacket()
             break;
         case 0x04:
             logHtml("<font color='red'>Ошибка размера данных команды (код ошибки: 04)</font><br>");
+            closeTest();
+            break;
+        default:
+            logHtml("<font color='red'>Неизвестная ошибка!</font><br>");
             closeTest();
             break;
         }

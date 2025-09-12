@@ -74,8 +74,8 @@
 #define UART_USB huart2 // для выбора uart (выставить huart2).
 #define UART_RS_232 huart1 // для выбора uart.
 #define UART_GPS huart6 // для выбора uart (выставить huart6).
-#define RS_232 7 // размер передаваемого массива функции massage_rs232.
-#define GPS_SIZE 49 // размер передаваемого массива функции massage_gps.
+#define RS_232 10 // размер передаваемого массива функции massage_rs232.
+#define GPS_SIZE 73 // размер передаваемого массива функции massage_gps.
 
 // функции подсчета переменных:
 void set_pins( uint8_t a3, uint8_t a2, uint8_t a1, uint8_t a0 ); // функция для выбора 1 из 16 выходов мультиплексора.

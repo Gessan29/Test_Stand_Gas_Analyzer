@@ -128,7 +128,7 @@ void choose_command(uint8_t* buffer, size_t* buffer_length)
     	apply_voltage_relay_5(buffer);
         break;
     case MASSAGE_RS232:
-    	*buffer_length = 5;
+    	*buffer_length = 10;
     	massage_rs232(buffer);
         break;
     case MASSAGE_NMEA:
