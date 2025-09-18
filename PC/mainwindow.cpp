@@ -136,7 +136,7 @@ void MainWindow::startTesting()
         //
         {0x00, 0x06}, // 25-ый {0x00, 0x06}
         {0x00, 0x05},
-        {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06}, {0x00, 0x06},
+        {0x00, 0x06}, {0x00, 0x06},
         {0x00, 0x08}, //32-ой
         {0x01, 0x09, 0x0A, 0x00, 0x00, 0x00},
         /*{0x01, 0x09, 0x0B, 0x00, 0x00, 0x00}
@@ -239,15 +239,17 @@ QString description (const QVector<uint8_t>& packet){
         else {return "Переключить тип входных цепей на эквивалентные схемы:"; }
     case 0x08:
         return "Тестирование работы интерфейса RS232:";
-    case 0x09: {
-        static bool isFirstTime = true;
-        if (isFirstTime) {
-            isFirstTime = false;
-            return "Тестирование работы интерфейса подключения GPS-приемника:";}
-        else {
-            return "";
-             }
-      }
+    case 0x09:
+        return "Тестирование работы интерфейса подключения GPS-приемника:";
+//    {
+//        static bool isFirstTime = true;
+//        if (isFirstTime) {
+//            isFirstTime = false;
+//            return "Тестирование работы интерфейса подключения GPS-приемника:";}
+//        else {
+//            return "";
+//             }
+//    }
 }
 }
 
@@ -329,28 +331,28 @@ void MainWindow::result(uint8_t* packet){
         handleCaseCommon(5, ratio, "Контрольная точка 5V (PW Peltier)");
         return;
     case 8:
-        handleCaseCommon(5.3, ratio, "Контрольная точка +5.3V");
+        //handleCaseCommon(5.3, ratio, "Контрольная точка +5.3V");
         return;
     case 9:
-        handleCaseCommon(3.3, ratio, "Контрольная точка +3.3V");
+        //handleCaseCommon(3.3, ratio, "Контрольная точка +3.3V");
         return;
     case 10:
-        handleCaseCommon(4, ratio, "Контрольная точка +4.1V (PW laser)");
+        //handleCaseCommon(4.1, ratio, "Контрольная точка +4.1V (PW laser)");
         return;
     case 14:
-        handleCaseCommon(1.2, 1, "Контрольная точка +1.2V");
+        //handleCaseCommon(1.2, 1, "Контрольная точка +1.2V");
         return;
     case 15:
-        handleCaseCommon(1.8, 1, "Контрольная точка +1.8V");
+        //handleCaseCommon(1.8, 1, "Контрольная точка +1.8V");
         return;
     case 16:
-        handleCaseCommon(2.5, 1, "Контрольная точка +2.5V");
+        //handleCaseCommon(2.5, 1, "Контрольная точка +2.5V");
         return;
     case 17:
         handleCaseCommon(5, ratio, "Контрольная точка +5V (Power GPS)");
         return;
     case 18:
-        //handleCaseCommon(5, ratio, "Контрольная точка +5V (REFP)"); // нет контакта
+        handleCaseCommon(5, ratio, "Контрольная точка +5V (REFP)"); // нет контакта
         return;
     case 19:
         handleCaseCommon(5, ratio, "Контрольная точка +5VAA (sensor)");
@@ -414,8 +416,8 @@ void MainWindow::result(uint8_t* packet){
                             check_mode_acm(cmd, status); }, Qt::UniqueConnection);
 
         connect(udpReceiver, &udp_um_receiver::vector_received,this, &MainWindow::on_um_vector_received,Qt::UniqueConnection);
-        connect(udpReceiver, &udp_um_receiver::data_ready, this,
-                [this](std::shared_ptr<um_data> data) {
+
+        connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data) {
 
                     float temperature = data->temperature;
                     logHtml(QString("<font color='blue'>Температура: %1 °C</font>").arg(temperature));
@@ -428,10 +430,8 @@ void MainWindow::result(uint8_t* packet){
                         logHtml("<font color='red'>Температура вне диапазона (25±1 °C)! Тест остановлен.</font><br>");
                         closeTest();
                     }
-
-                    disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
-                },
-                Qt::UniqueConnection);
+                        disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
+                }, Qt::UniqueConnection);
           }
         return;
     case 25:
@@ -475,32 +475,20 @@ void MainWindow::result(uint8_t* packet){
                 logHtml("<font color='green'>Продолжение теста...</font><br>");
             }
 
-        test_temp(28);
+        test_temp(30);
         return;
     }
 
     case 27:
         peltie();
-        test_temp(22);
+        test_temp(-20);
         return;
     case 28:
-        peltie();
-        test_temp(55);
-        return;
-    case 29:
-        peltie();
-        test_temp(-5);
-        return;
-    case 30:
-        peltie();
-        test_temp(25);
-        return;
-    case 31:
         peltie();
         udpSender->exec_cmd(um_alg_cmd::stop);
         return;
 
-    case 32:
+    case 29:
         if (parser.buffer[5] == 0x01 && parser.buffer[6] == 0x02 && parser.buffer[7] == 0x02 && parser.buffer[8] == 0x00){
             logHtml("<font color='green'>Тестирование RS-232 пройдено, сообщение получено.</font><br>");
             return;
@@ -508,7 +496,7 @@ void MainWindow::result(uint8_t* packet){
         logHtml("<font color='red'>Тестирование RS-232 не пройдено!</font><br>");
         return;
 
-    case 33:
+    case 30:
     /*case 30: //еще 9 измерений для GPS не забыть вернуть, сейчас только одно
     case 31:
     case 32:
@@ -520,18 +508,26 @@ void MainWindow::result(uint8_t* packet){
     case 38:*/
         udpSender->exec_cmd(um_alg_cmd::test);
         sendTimer->start(3000);
-        if (currentPacketIndex == 33){ // поменять на 38
-        logHtml("<font color='green'>Тестирование GPS успешно пройдено</font><br>"); }
+        connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
+                         bool status = data->gpsGeoData.dataValid;
+                         uint8_t sec = data->gpsGeoData.sec;
+                         if (!status || sec != 0x04){
+                             logHtml("<font color='red'>Тестирование GPS не пройдено!</font><br>");
+                         } else if (currentPacketIndex == 30 ){ // поменять на 38
+                                    logHtml("<font color='green'>Тестирование GPS успешно пройдено</font><br>");
+                         }
+                         disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
+        }, Qt::UniqueConnection);
         return;
 
+    case 31:
+    case 32:
+    case 33:
     case 34:
-    case 35:
-    case 36:
-    case 37:
         logHtml("<font color='green'>Выполнено!</font><br>");
         return;
 
-    case 38:
+    case 35:
         logHtml("<font color='green'>Выполнено!</font><br>");
 
         sendTimer->stop();
@@ -581,10 +577,9 @@ void MainWindow::startAveragingMeasurements()
     QTimer timeoutTimer;
     timeoutTimer.setSingleShot(true);
     connect(&timeoutTimer, &QTimer::timeout, &averagingloop, &QEventLoop::quit);
-    timeoutTimer.start(1000);
+    timeoutTimer.start(2000);
 
-    connect(udpReceiver, &udp_um_receiver::data_ready, this,
-            [this](std::shared_ptr<um_data> data) {
+    connect(udpReceiver, &udp_um_receiver::data_ready, this,[this](std::shared_ptr<um_data> data) {
                 if (!averagingInProgress) {
                     averagingloop.quit();
                     return;
@@ -598,11 +593,10 @@ void MainWindow::startAveragingMeasurements()
                     averagingInProgress = false;
                     averagingloop.quit();
                 }
-            },
-            Qt::UniqueConnection);
+                disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
 
+            }, Qt::UniqueConnection);
             averagingloop.exec();
-            disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
 
             if (measurementCount > 0) {
                     processAveragedResults();

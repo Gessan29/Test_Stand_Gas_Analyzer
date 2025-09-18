@@ -1370,7 +1370,7 @@ void test_voltage_peltie(uint8_t* buf)
 	int16_t vol_raw, tok = 0, res_shunt = RES_SHUNT_PELTIE;
  8000b50:	2300      	movs	r3, #0
  8000b52:	83fb      	strh	r3, [r7, #30]
- 8000b54:	f640 33b8 	movw	r3, #3000	@ 0xbb8
+ 8000b54:	f640 132e 	movw	r3, #2350	@ 0x92e
  8000b58:	83bb      	strh	r3, [r7, #28]
 	ADC_ChannelConfTypeDef sConfig = {0};
  8000b5a:	f107 0308 	add.w	r3, r7, #8
