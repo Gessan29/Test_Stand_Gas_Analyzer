@@ -15,6 +15,12 @@ PlotHandles setupMainPlot(QCustomPlot* plot){
     plot->xAxis->setLabel("Время");
     plot->yAxis->setLabel("Напряжение, В");
 
+    // Включаем масштабирование и перетаскивание
+    plot->setInteraction(QCP::iRangeDrag, true);
+    plot->setInteraction(QCP::iRangeZoom, true);
+    plot->axisRect()->setRangeDrag(Qt::Horizontal | Qt::Vertical);
+    plot->axisRect()->setRangeZoom(Qt::Horizontal | Qt::Vertical);
+
     return handles;
 }
 
@@ -34,13 +40,32 @@ void plotAdcData(QCustomPlot* plot, const QByteArray& byteArray)
         y[i] = static_cast<double>(value) / 1000;
     }
 
-    plot->clearGraphs();
-    plot->addGraph();
-    plot->graph(0)->setData(x, y);
+    if (plot->graphCount() == 0)
+            plot->addGraph();
+
+        plot->graph(0)->setData(x, y);
+
     plot->xAxis->setLabel("Номер точки (сигнал лазерного диода)");
     plot->yAxis->setLabel("Напряжение, В");
     plot->xAxis->setRange(0, 99);
     plot->yAxis->setRange(0, 3.3);
+
+    // Включаем масштабирование и перетаскивание
+    plot->setInteraction(QCP::iRangeDrag, true);
+    plot->setInteraction(QCP::iRangeZoom, true);
+    plot->axisRect()->setRangeDrag(Qt::Horizontal | Qt::Vertical);
+    plot->axisRect()->setRangeZoom(Qt::Horizontal | Qt::Vertical);
+
     plot->replot();
+
+
+//    plot->clearGraphs();
+//    plot->addGraph();
+//    plot->graph(0)->setData(x, y);
+//    plot->xAxis->setLabel("Номер точки (сигнал лазерного диода)");
+//    plot->yAxis->setLabel("Напряжение, В");
+//    plot->xAxis->setRange(0, 99);
+//    plot->yAxis->setRange(0, 3.3);
+//    plot->replot();
 
 }

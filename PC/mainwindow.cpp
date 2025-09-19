@@ -660,8 +660,11 @@ void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vecto
             break;
     }
 
-    ui->customPlot->rescaleAxes();
-    ui->customPlot->xAxis->setRange(timeCounter - maxPoints * dt, timeCounter);
+    if (!ui->customPlot->xAxis->range().contains(timeCounter)) {
+            ui->customPlot->xAxis->setRange(timeCounter - maxPoints * dt, timeCounter);
+        }
+
+        ui->customPlot->replot();
 
 }
 
