@@ -6,8 +6,8 @@ struct PlotHandles {
     QCPGraph* graphAnl = nullptr;
 };
 
-PlotHandles setupMainPlot(QCustomPlot* plot);
+PlotHandles setupMainPlot(QCustomPlot* plot, QCustomPlot* plot_2);
 
-void plotAdcData(QCustomPlot* plot2, const QByteArray& byteArray);
+void plotAdcData(const QByteArray& byteArray);
 
 #endif // PLOTSETUP_H

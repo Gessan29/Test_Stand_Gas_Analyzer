@@ -47,6 +47,7 @@ private slots:
     void handleCaseCommon(double sample, double ratio, const QString& labelText);
     void setupPort();
     void peltie();
+    void set_param(float temp);
     void setupConnections();
     void onResponseTimeout();
     void closeTest();
@@ -64,7 +65,10 @@ private:
     QTimer* sendTimer; // таймер для отправки следующих пакетов через задержку
     QTimer* responseTimer; // таймер ожидания ответа от МК
     QTimer* outputTimer = nullptr; // таймер для вывода данных с АЦМ
-    QTimer* plotTimer = nullptr; // таймер для replot()
+
+    QVector<double> lastX;
+    QVector<double> lastRef, lastAnl;
+    QTimer *plotTimer;
 
     QCPGraph* graphRef = nullptr;
     QCPGraph* graphAnl = nullptr;

@@ -24,16 +24,23 @@ MainWindow::MainWindow(QWidget *parent)
     setupConnections();
     parser.state = protocol_parser::STATE_SYNC;
 
-    auto plots = setupMainPlot(ui->customPlot);
+    auto plots = setupMainPlot(ui->customPlot, ui->customPlot_2);
     graphRef = plots.graphRef;
     graphAnl = plots.graphAnl;
 
-    // Таймер для перерисовки
-        plotTimer = new QTimer(this);
-        connect(plotTimer, &QTimer::timeout, this, [this]() {
+    plotTimer = new QTimer(this);
+    connect(plotTimer, &QTimer::timeout, this, [this]() {
+        if (!lastX.isEmpty()) {
+            if (graphRef) {
+                graphRef->setData(lastX, lastRef);
+            }
+            if (graphAnl) {
+                graphAnl->setData(lastX, lastAnl);
+            }
             ui->customPlot->replot();
-        });
-        plotTimer->start(300);
+        }
+    });
+    plotTimer->start(50); // перерисовка каждые 50 мс
 }
 
 MainWindow::~MainWindow() {
@@ -119,6 +126,14 @@ void MainWindow::logHtml(const QString& message) {
 
 void MainWindow::startTesting()
 {
+  // очистка графиков перед стартом
+    lastX.clear();
+    lastRef.clear();
+    lastAnl.clear();
+    if (graphRef) graphRef->data()->clear();
+    if (graphAnl) graphAnl->data()->clear();
+    ui->customPlot->replot();
+
     acmModePrinted = false;
 
     currentPacketIndex = 0;
@@ -376,13 +391,22 @@ void MainWindow::result(uint8_t* packet){
         responseTimer->stop();
 
         CustomDialog dialog_1(this,"Выполните условие", "Прошейте МК и ПЛИС","Ок","Не удалось прошить"); // Добавить фунцию
-        if (dialog_1.exec()) {
-                logHtml("<font color='green'>МК и ПЛИС прошиты. Продолжение теста...</font><br>");
-            } else {
-                logHtml("<font color='red'>МК и ПЛИС не прошиты.</font><br>");
-                closeTest();
-                return;
-            }
+        bool ok = dialog_1.execDialog();
+        if (ok) {
+            logHtml("<font color='green'>МК и ПЛИС прошиты. Продолжение теста...</font><br>");
+        } else {
+            logHtml("<font color='red'>МК и ПЛИС не прошиты.</font><br>");
+            closeTest();
+            return;
+        }
+//        if (dialog_1.exec()) {
+//                logHtml("<font color='green'>МК и ПЛИС прошиты. Продолжение теста...</font><br>");
+//            } else {
+//                logHtml("<font color='red'>МК и ПЛИС не прошиты.</font><br>");
+//                closeTest();
+//                return;
+//              }
+
         logHtml("<font color='blue'>Поиск устройства по Ethernet...</font><br>");
 
             QEventLoop waitLoop;
@@ -411,9 +435,9 @@ void MainWindow::result(uint8_t* packet){
             closeTest();
         }
 
-        udpSender->exec_cmd(um_alg_cmd::test);
-        connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){
-                            check_mode_acm(cmd, status); }, Qt::UniqueConnection);
+        udpSender->exec_cmd(um_alg_cmd::test);     
+        connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){check_mode_acm(cmd, status); }, Qt::UniqueConnection);
+        set_param(25);
 
         connect(udpReceiver, &udp_um_receiver::vector_received,this, &MainWindow::on_um_vector_received,Qt::UniqueConnection);
 
@@ -465,15 +489,14 @@ void MainWindow::result(uint8_t* packet){
         if (parser.buffer_length < 201) {
             logHtml("<font color='red'>Недостаточно данных для построения графика</font><br>");
             return; }
-        plotAdcData(ui->customPlot_2, rawData);
+        plotAdcData(rawData);
+
         logHtml("<font color='green'>Снято 100 точек напряжений, построен график.</font><br>");
 
         sendTimer->stop();
         responseTimer->stop();
         CustomDialog dialog_2(this,"Ожидание", "Пауза","Ок"); // Добавить фунцию
-        if (dialog_2.exec()) {
-                logHtml("<font color='green'>Продолжение теста...</font><br>");
-            }
+        //if (dialog_2.exec()) { logHtml("<font color='green'>Продолжение теста...</font><br>"); }
 
         test_temp(30);
         return;
@@ -485,7 +508,7 @@ void MainWindow::result(uint8_t* packet){
         return;
     case 28:
         peltie();
-        udpSender->exec_cmd(um_alg_cmd::stop);
+        //udpSender->exec_cmd(um_alg_cmd::stop);
         return;
 
     case 29:
@@ -506,7 +529,7 @@ void MainWindow::result(uint8_t* packet){
     case 36:
     case 37:
     case 38:*/
-        udpSender->exec_cmd(um_alg_cmd::test);
+        //udpSender->exec_cmd(um_alg_cmd::test);
         sendTimer->start(3000);
         connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
                          bool status = data->gpsGeoData.dataValid;
@@ -537,6 +560,31 @@ void MainWindow::result(uint8_t* packet){
         logHtml("<font color='green'>Тестирование успешно пройдено!</font><br>");
         closeTest();
     }
+}
+
+void MainWindow::set_param(float temp){
+
+    udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
+            .laserWfm = {
+                .zeroLevel  = 0.0,
+                .beginLevel = 120,
+                .endLevel   = 240,
+                .beginTime  = 0,
+                .endTime    = 150
+            },
+            .workTemp = temp,
+            .workLine = 90,
+            .regParam = {
+                .kp               = 0.1,
+                .ki               = 0,
+                .maxSetDiff       = 1,
+                .lineToTempCoef   = 20,
+                .switchToLineThr  = 15,
+                .lineStableThr    = 0.1
+            },
+            .control = um_test_mode_control::only_temperature
+        })
+    );
 }
 
 void MainWindow::test_temp(float temp){
@@ -630,41 +678,18 @@ void MainWindow::processAveragedResults()
 
 void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vector)
 {
-    static double timeCounter = 0.0;
-    const double dt = 0.50;           // 10 мс между точками
-    const int maxPoints = 5000;
-
-    QVector<double> x(vector.size()), y(vector.size());
-    for (int i = 0; i < (int)vector.size(); ++i) {
-        x[i] = timeCounter;
-        y[i] = static_cast<double>(vector[i]);
-        timeCounter += dt;
-    }
-
-    switch (id) {
-        case um_vector_id::nrm_ref:
-            if (graphRef) {
-                graphRef->addData(x, y);
-                graphRef->removeDataBefore(timeCounter - maxPoints * dt);
-            }
-            break;
-
-        case um_vector_id::nrm_anl:
-            if (graphAnl) {
-                graphAnl->addData(x, y);
-                graphAnl->removeDataBefore(timeCounter - maxPoints * dt);
-            }
-            break;
-
-        default:
-            break;
-    }
-
-    if (!ui->customPlot->xAxis->range().contains(timeCounter)) {
-            ui->customPlot->xAxis->setRange(timeCounter - maxPoints * dt, timeCounter);
+    int n = static_cast<int>(vector.size());
+        QVector<double> x(n), y(n);
+        for (int i = 0; i < n; ++i) {
+            x[i] = i;
+            y[i] = static_cast<double>(vector[i]);
         }
 
-        ui->customPlot->replot();
+        lastX = x;
+        if (id == um_vector_id::nrm_ref)
+            lastRef = y;
+        else if (id == um_vector_id::nrm_anl)
+            lastAnl = y;
 
 }
 
@@ -788,14 +813,6 @@ void MainWindow::stopTesting()
     averagingloop.quit();
 
     udpSender->exec_cmd(um_alg_cmd::stop); // остановка режима тестирования платы АЦМ
-
-    // Очистка графиков
-       if (graphRef) graphRef->data()->clear();
-       if (graphAnl) graphAnl->data()->clear();
-       ui->customPlot->replot();
-
-       ui->customPlot_2->clearGraphs();
-       ui->customPlot_2->replot();
 
     // Очищаем данные
     testPackets.clear();

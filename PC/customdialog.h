@@ -1,55 +1,57 @@
-// файл класса для создания кастомных диалоговых окон
 #ifndef CUSTOMDIALOG_H
 #define CUSTOMDIALOG_H
 
+#include <QDialog>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QAbstractButton>
-#include <QWidget>
+#include <QVBoxLayout>
+#include <QLabel>
 
-class CustomDialog {
+class CustomDialog : public QDialog {
+    Q_OBJECT
 public:
-    CustomDialog(QWidget *parent,
-                 const QString &title,
-                 const QString &message,
-                 const QString &acceptText,
-                 const QString &rejectText)
-        : parentWidget(parent),
-          dialogTitle(title),
-          dialogMessage(message),
-          acceptButtonText(acceptText),
-          rejectButtonText(rejectText),
-          butt(true) {}
+    explicit CustomDialog(QWidget *parent,
+                          const QString &title,
+                          const QString &message,
+                          const QString &acceptText,
+                          const QString &rejectText = QString())
+        : QDialog(parent)
+    {
+        setWindowTitle(title);
+        setWindowModality(Qt::WindowModal); // блокирует алгоритм, но не весь GUI
+        QVBoxLayout *layout = new QVBoxLayout(this);
 
-    CustomDialog(QWidget *parent,
-                 const QString &title,
-                 const QString &message,
-                 const QString &acceptText)
-        : parentWidget(parent),
-          dialogTitle(title),
-          dialogMessage(message),
-          acceptButtonText(acceptText),
-          butt(false) {}
+        QLabel *label = new QLabel(message, this);
+        layout->addWidget(label);
 
-    bool exec() {
-        QMessageBox msgBox(parentWidget);
-        msgBox.setWindowTitle(dialogTitle);
-        msgBox.setText(dialogMessage);
-        QAbstractButton *btnAccept = msgBox.addButton(acceptButtonText, QMessageBox::AcceptRole);
-        if (butt){
-        QAbstractButton *btnReject = msgBox.addButton(rejectButtonText, QMessageBox::RejectRole);
+        QHBoxLayout *buttonLayout = new QHBoxLayout();
+        QPushButton *btnAccept = new QPushButton(acceptText, this);
+        buttonLayout->addWidget(btnAccept);
+        connect(btnAccept, &QPushButton::clicked, this, [this]() {
+            acceptedFlag = true;
+            accept(); // закрываем диалог
+        });
+
+        if (!rejectText.isEmpty()) {
+            QPushButton *btnReject = new QPushButton(rejectText, this);
+            buttonLayout->addWidget(btnReject);
+            connect(btnReject, &QPushButton::clicked, this, [this]() {
+                acceptedFlag = false;
+                reject(); // закрываем диалог
+            });
         }
-        msgBox.exec();
-        return msgBox.clickedButton() == btnAccept;
+
+        layout->addLayout(buttonLayout);
+    }
+
+    bool execDialog() {
+        acceptedFlag = false;
+        QDialog::exec(); // блокирует алгоритм
+        return acceptedFlag;
     }
 
 private:
-    QWidget *parentWidget;
-    QString dialogTitle;
-    QString dialogMessage;
-    QString acceptButtonText;
-    QString rejectButtonText;
-    bool butt;
+    bool acceptedFlag = false;
 };
 
 #endif // CUSTOMDIALOG_H
