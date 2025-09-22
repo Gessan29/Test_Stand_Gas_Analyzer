@@ -8,6 +8,7 @@
 #include <QMessageBox>
 #include <QString>
 #include <QWidget>
+#include <QMutex>
 
 #include "plotsetup.h"
 #include "qcustomplot.h"
@@ -73,6 +74,9 @@ private:
     QCPGraph* graphRef = nullptr;
     QCPGraph* graphAnl = nullptr;
     double xCounter = 0;   // счетчик точек
+
+    QMutex dataMutex;
+    bool dataUpdated = false; // флаг обновления данных для аналит. и реп. каналов
 
     bool ethernetConnected = false; // флаг соединения Ethernet
 

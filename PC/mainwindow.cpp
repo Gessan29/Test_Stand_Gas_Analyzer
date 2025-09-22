@@ -30,17 +30,20 @@ MainWindow::MainWindow(QWidget *parent)
 
     plotTimer = new QTimer(this);
     connect(plotTimer, &QTimer::timeout, this, [this]() {
-        if (!lastX.isEmpty()) {
-            if (graphRef) {
-                graphRef->setData(lastX, lastRef);
-            }
-            if (graphAnl) {
-                graphAnl->setData(lastX, lastAnl);
-            }
-            ui->customPlot->replot();
-        }
-    });
-    plotTimer->start(50); // перерисовка каждые 50 мс
+        QMutexLocker locker(&dataMutex);
+
+        if (!dataUpdated) return;
+
+        if (graphRef) graphRef->setData(lastX, lastRef);
+        if (graphAnl) graphAnl->setData(lastX, lastAnl);
+
+        ui->customPlot->replot();
+
+        dataUpdated = false;
+
+        });
+        plotTimer->start(50);
+
 }
 
 MainWindow::~MainWindow() {
@@ -489,15 +492,16 @@ void MainWindow::result(uint8_t* packet){
         if (parser.buffer_length < 201) {
             logHtml("<font color='red'>Недостаточно данных для построения графика</font><br>");
             return; }
-        plotAdcData(rawData);
+        plotAdcData(rawData, ui->customPlot_2);
 
         logHtml("<font color='green'>Снято 100 точек напряжений, построен график.</font><br>");
 
         sendTimer->stop();
         responseTimer->stop();
         CustomDialog dialog_2(this,"Ожидание", "Пауза","Ок"); // Добавить фунцию
+        bool ok = dialog_2.execDialog();
+        if (ok) {      logHtml("<font color='green'>Продолжение теста...</font><br>");        }
         //if (dialog_2.exec()) { logHtml("<font color='green'>Продолжение теста...</font><br>"); }
-
         test_temp(30);
         return;
     }
@@ -678,19 +682,29 @@ void MainWindow::processAveragedResults()
 
 void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vector)
 {
-    int n = static_cast<int>(vector.size());
-        QVector<double> x(n), y(n);
+        QMutexLocker locker(&dataMutex);
+
+        int n = vector.size();
+
+        QVector<double> y(n), x(n);
+
         for (int i = 0; i < n; ++i) {
             x[i] = i;
-            y[i] = static_cast<double>(vector[i]);
+            y[i] = static_cast<double>(vector[i+27]);
         }
 
         lastX = x;
-        if (id == um_vector_id::nrm_ref)
-            lastRef = y;
-        else if (id == um_vector_id::nrm_anl)
-            lastAnl = y;
 
+        switch (id) {
+        case um_vector_id::nrm_ref:
+                    lastRef = y;
+                    break;
+                case um_vector_id::nrm_anl:
+                    lastAnl = y;
+                    break;
+        }
+
+        dataUpdated = true;
 }
 
 void MainWindow::check_mode_acm(um_alg_cmd cmd, um_status status){
