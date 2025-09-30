@@ -580,8 +580,9 @@ void MainWindow::result(uint8_t* packet){
         sendTimer->stop();
         responseTimer->stop();
         CustomDialog dialog_3(this, "Проверка","Ожидание ответа от пользователя","Продолжить"); // Добавить фунцию
-        dialog_3.exec();
-        logHtml("<font color='green'>Тестирование успешно пройдено!</font><br>");
+        if (dialog_3.execDialog()){
+            logHtml("<font color='green'>Тестирование успешно пройдено!</font><br>");
+        }
         closeTest();
     }
 }

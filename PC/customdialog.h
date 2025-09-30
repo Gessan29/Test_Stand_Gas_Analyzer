@@ -1,6 +1,7 @@
 #ifndef CUSTOMDIALOG_H
 #define CUSTOMDIALOG_H
 
+#include "qeventloop.h"
 #include <QDialog>
 #include <QMessageBox>
 #include <QPushButton>
@@ -18,7 +19,7 @@ public:
         : QDialog(parent)
     {
         setWindowTitle(title);
-        setWindowModality(Qt::WindowModal); // блокирует алгоритм, но не весь GUI
+        setWindowModality(Qt::NonModal);
         QVBoxLayout *layout = new QVBoxLayout(this);
 
         QLabel *label = new QLabel(message, this);
@@ -44,9 +45,15 @@ public:
         layout->addLayout(buttonLayout);
     }
 
-    bool execDialog() {
+    bool execDialog(){
         acceptedFlag = false;
-        QDialog::exec(); // блокирует алгоритм
+
+        QEventLoop loop;
+        connect(this, &QDialog::finished, &loop, &QEventLoop::quit);
+
+        this->show();
+        loop.exec();
+
         return acceptedFlag;
     }
 
