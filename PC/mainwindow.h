@@ -67,8 +67,7 @@ private:
     QTimer* responseTimer; // таймер ожидания ответа от МК
     QTimer* outputTimer = nullptr; // таймер для вывода данных с АЦМ
 
-    QVector<double> lastX;
-    QVector<double> lastRef, lastAnl;
+    QVector<double> lastRef, lastAnl, lastX;
     QTimer *plotTimer;
 
     QCPGraph* graphRef = nullptr;

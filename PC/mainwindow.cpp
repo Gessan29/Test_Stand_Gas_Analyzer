@@ -5,9 +5,9 @@
 
 static const quint16 defaultSenderPort = 30000;
 static const quint16 defaultListenPort = 30001;
-bool index = true;
-int size_tmp = 1;
-double ratio = 0.3589;
+
+const double ratio = 0.3589;
+QMetaObject::Connection conn_data, conn_rec;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     setupPort();
     setupConnections();
-    parser.state = protocol_parser::STATE_SYNC;
+    parser.state = protocol_parser::STATE_SYNC; 
 
     auto plots = setupMainPlot(ui->customPlot, ui->customPlot_2);
     graphRef = plots.graphRef;
@@ -42,7 +42,6 @@ MainWindow::MainWindow(QWidget *parent)
         dataUpdated = false;
 
         });
-        plotTimer->start(50);
 
 }
 
@@ -129,13 +128,12 @@ void MainWindow::logHtml(const QString& message) {
 
 void MainWindow::startTesting()
 {
-  // очистка графиков перед стартом
-    lastX.clear();
-    lastRef.clear();
-    lastAnl.clear();
     if (graphRef) graphRef->data()->clear();
     if (graphAnl) graphAnl->data()->clear();
     ui->customPlot->replot();
+
+    ui->customPlot_2->clearGraphs();
+    ui->customPlot_2->replot();
 
     acmModePrinted = false;
 
@@ -200,7 +198,7 @@ void MainWindow::sendNextPacket()
 //     ui->plainTextEdit->appendHtml(QString("<font color='green'>Отправлен пакет %1: %2</font><br>") // для просмотра отправленных пакетов
 //                                      .arg(currentPacketIndex)
 //                                      .arg(QString::fromUtf8(byteArray.toHex(' ').toUpper())));
-
+    plotTimer->start(50);
     responseTimer->start(10000);
     sendTimer->stop();
 }
@@ -402,13 +400,6 @@ void MainWindow::result(uint8_t* packet){
             closeTest();
             return;
         }
-//        if (dialog_1.exec()) {
-//                logHtml("<font color='green'>МК и ПЛИС прошиты. Продолжение теста...</font><br>");
-//            } else {
-//                logHtml("<font color='red'>МК и ПЛИС не прошиты.</font><br>");
-//                closeTest();
-//                return;
-//              }
 
         logHtml("<font color='blue'>Поиск устройства по Ethernet...</font><br>");
 
@@ -423,10 +414,10 @@ void MainWindow::result(uint8_t* packet){
             udpSender->send_search_packet();
 
             QEventLoop connectionLoop;
-                QTimer connectionTimer;
-                connectionTimer.setSingleShot(true);
-                connect(&connectionTimer, &QTimer::timeout, &connectionLoop, &QEventLoop::quit);
-                connect(udpReceiver, &udp_um_receiver::device_found, &connectionLoop, &QEventLoop::quit, Qt::UniqueConnection);
+            QTimer connectionTimer;
+            connectionTimer.setSingleShot(true);
+            connect(&connectionTimer, &QTimer::timeout, &connectionLoop, &QEventLoop::quit);
+            connect(udpReceiver, &udp_um_receiver::device_found, &connectionLoop, &QEventLoop::quit, Qt::UniqueConnection);
 
                 connectionTimer.start(5000);
                 connectionLoop.exec();
@@ -439,12 +430,13 @@ void MainWindow::result(uint8_t* packet){
         }
 
         udpSender->exec_cmd(um_alg_cmd::test);     
-        connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){check_mode_acm(cmd, status); }, Qt::UniqueConnection);
+        conn_data = connect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, [this](um_alg_cmd cmd, um_status status){check_mode_acm(cmd, status); }, Qt::UniqueConnection);
         set_param(25);
+        disconnect(conn_data);
 
-        connect(udpReceiver, &udp_um_receiver::vector_received,this, &MainWindow::on_um_vector_received,Qt::UniqueConnection);
+        conn_rec = connect(udpReceiver, &udp_um_receiver::vector_received,this, &MainWindow::on_um_vector_received, Qt::UniqueConnection);
 
-        connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data) {
+        conn_data = connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data) {
 
                     float temperature = data->temperature;
                     logHtml(QString("<font color='blue'>Температура: %1 °C</font>").arg(temperature));
@@ -457,34 +449,14 @@ void MainWindow::result(uint8_t* packet){
                         logHtml("<font color='red'>Температура вне диапазона (25±1 °C)! Тест остановлен.</font><br>");
                         closeTest();
                     }
-                        disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
-                }, Qt::UniqueConnection);
+                disconnect(conn_data);
+                });
           }
         return;
-    case 25:
-        peltie(); // выставить правильно погрешность
 
-        udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
-                .laserWfm = {
-                    .zeroLevel  = 0.0,
-                    .beginLevel = 120,
-                    .endLevel   = 240,
-                    .beginTime  = 0,
-                    .endTime    = 150
-                },
-                .workTemp = 25,
-                .workLine = 90,
-                .regParam = {
-                    .kp               = 0.1,
-                    .ki               = 0,
-                    .maxSetDiff       = 1,
-                    .lineToTempCoef   = 20,
-                    .switchToLineThr  = 15,
-                    .lineStableThr    = 0.1
-                },
-                .control = um_test_mode_control::only_temperature
-            })
-        );
+    case 25:
+        peltie();
+        set_param(25);
         return;
 
     case 26: {
@@ -500,8 +472,8 @@ void MainWindow::result(uint8_t* packet){
         responseTimer->stop();
         CustomDialog dialog_2(this,"Ожидание", "Пауза","Ок"); // Добавить фунцию
         bool ok = dialog_2.execDialog();
-        if (ok) {      logHtml("<font color='green'>Продолжение теста...</font><br>");        }
-        //if (dialog_2.exec()) { logHtml("<font color='green'>Продолжение теста...</font><br>"); }
+        if (ok) {      logHtml("<font color='green'>Продолжение теста...</font><br>");        }      
+
         test_temp(30);
         return;
     }
@@ -512,7 +484,7 @@ void MainWindow::result(uint8_t* packet){
         return;
     case 28:
         peltie();
-        //udpSender->exec_cmd(um_alg_cmd::stop);
+        udpSender->exec_cmd(um_alg_cmd::stop);
         return;
 
     case 29:
@@ -523,7 +495,7 @@ void MainWindow::result(uint8_t* packet){
         logHtml("<font color='red'>Тестирование RS-232 не пройдено!</font><br>");
         return;
 
-    case 30:
+    case 30: {
     /*case 30: //еще 9 измерений для GPS не забыть вернуть, сейчас только одно
     case 31:
     case 32:
@@ -533,29 +505,77 @@ void MainWindow::result(uint8_t* packet){
     case 36:
     case 37:
     case 38:*/
-        //udpSender->exec_cmd(um_alg_cmd::test);
-        sendTimer->start(3000);
-        connect(udpReceiver, &udp_um_receiver::data_ready, this, [this](std::shared_ptr<um_data> data){
-                         bool status = data->gpsGeoData.dataValid;
-                         uint8_t sec = data->gpsGeoData.sec;
-                         if (!status || sec != 0x04){
-                             logHtml("<font color='red'>Тестирование GPS не пройдено!</font><br>");
-                         } else if (currentPacketIndex == 30 ){ // поменять на 38
-                                    logHtml("<font color='green'>Тестирование GPS успешно пройдено</font><br>");
-                         }
-                         disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
-        }, Qt::UniqueConnection);
+        udpSender->exec_cmd(um_alg_cmd::test);
+        set_param(25);
+
+        bool gpsSuccess = false;
+        int gpsCheckCount = 0;
+
+        QMetaObject::Connection gpsConnection;
+        bool shouldCheckGps = true;
+
+        gpsConnection = connect(udpReceiver, &udp_um_receiver::data_ready, this, [this, &gpsSuccess, &gpsCheckCount, &shouldCheckGps](std::shared_ptr<um_data> data) {
+                if (!shouldCheckGps) return;
+
+                gpsCheckCount++;
+                bool status = data->gpsGeoData.dataValid;
+                uint8_t sec = data->gpsGeoData.sec;
+
+                if (status && sec == 0x04) {
+                    gpsSuccess = true;
+                    shouldCheckGps = false;
+                }
+            });
+
+        QEventLoop waitLoop;
+        QTimer::singleShot(500, &waitLoop, &QEventLoop::quit);
+        waitLoop.exec();
+
+        disconnect(gpsConnection);
+
+        if (gpsSuccess) {
+            logHtml("<font color='green'>Тестирование GPS успешно пройдено</font><br>");
+        } else {
+            logHtml("<font color='red'>Тестирование GPS не пройдено!</font><br>");
+        }
+
+        udpSender->exec_cmd(um_alg_cmd::stop);
+
+        sendTimer->start(300);
         return;
+    }
 
     case 31:
     case 32:
-    case 33:
-    case 34:
         logHtml("<font color='green'>Выполнено!</font><br>");
         return;
 
-    case 35:
+    case 33: {
+        QEventLoop waitPW;
+        QTimer waitTimerPW;
+        waitTimerPW.setSingleShot(true);
+        connect(&waitTimerPW, &QTimer::timeout, &waitPW, &QEventLoop::quit);
+        waitTimerPW.start(2000);
+        waitPW.exec();
         logHtml("<font color='green'>Выполнено!</font><br>");
+        return;
+        }
+    case 34:
+        handleCaseCommon(11.5, 0.1666, "Питание платы,");
+        return;
+
+    case 35:
+        sample = 0.15;
+        data = (parser.buffer[2] << 8) | parser.buffer[1];
+        tok = (float)data / 1000.0;
+        tok = tok / (0.018 * 200);
+        if (tok >= sample - 0.1 && tok <= sample + 0.1){
+            logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(tok, 0, 'f', 3));
+        }
+        else {
+           logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(tok, 0, 'f', 3));
+           closeTest();
+           }
 
         sendTimer->stop();
         responseTimer->stop();
@@ -593,27 +613,7 @@ void MainWindow::set_param(float temp){
 
 void MainWindow::test_temp(float temp){
     logHtml(QString("Установить температуру %1 °C:</font>").arg(temp));
-    udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
-            .laserWfm = {
-                .zeroLevel  = 0.0,
-                .beginLevel = 120,
-                .endLevel   = 240,
-                .beginTime  = 0,
-                .endTime    = 150
-            },
-            .workTemp = temp,
-            .workLine = 90,
-            .regParam = {
-                .kp               = 0.1,
-                .ki               = 0,
-                .maxSetDiff       = 1,
-                .lineToTempCoef   = 20,
-                .switchToLineThr  = 15,
-                .lineStableThr    = 0.1
-            },
-            .control = um_test_mode_control::only_temperature
-        })
-    );
+    set_param(temp);
     startAveragingMeasurements();
 }
 
@@ -631,7 +631,7 @@ void MainWindow::startAveragingMeasurements()
     connect(&timeoutTimer, &QTimer::timeout, &averagingloop, &QEventLoop::quit);
     timeoutTimer.start(2000);
 
-    connect(udpReceiver, &udp_um_receiver::data_ready, this,[this](std::shared_ptr<um_data> data) {
+    conn_data = connect(udpReceiver, &udp_um_receiver::data_ready, this,[this](std::shared_ptr<um_data> data) {
                 if (!averagingInProgress) {
                     averagingloop.quit();
                     return;
@@ -644,10 +644,12 @@ void MainWindow::startAveragingMeasurements()
                 if (measurementCount >= requiredMeasurements) {
                     averagingInProgress = false;
                     averagingloop.quit();
-                }
-                disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
+                }              
 
-            }, Qt::UniqueConnection);
+                disconnect(conn_data);
+
+            });
+
             averagingloop.exec();
 
             if (measurementCount > 0) {
@@ -685,12 +687,14 @@ void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vecto
         QMutexLocker locker(&dataMutex);
 
         int n = vector.size();
-
+        if ( n < 200 ){
+            return;
+        }
         QVector<double> y(n), x(n);
 
         for (int i = 0; i < n; ++i) {
             x[i] = i;
-            y[i] = static_cast<double>(vector[i+27]);
+            y[i] = static_cast<double>(vector[i+1]);
         }
 
         lastX = x;
@@ -812,14 +816,15 @@ void MainWindow::handleParserError()
 void MainWindow::stopTesting()
 {
     if (sendTimer && sendTimer->isActive()) sendTimer->stop();
-        if (responseTimer && responseTimer->isActive()) responseTimer->stop();
-        if (plotTimer && plotTimer->isActive()) plotTimer->stop();
+    if (responseTimer && responseTimer->isActive()) responseTimer->stop();
+    if (plotTimer && plotTimer->isActive()) plotTimer->stop();
 
-        // Отключаем все соединения UDP
-        disconnect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::updateConnectionStatus);
-        disconnect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, nullptr);
-        disconnect(udpReceiver, &udp_um_receiver::vector_received, this, nullptr);
-        disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
+
+    disconnect(udpReceiver, &udp_um_receiver::device_found, this, &MainWindow::updateConnectionStatus);
+    disconnect(udpReceiver, &udp_um_receiver::alg_cmd_executed, this, nullptr);
+    disconnect(udpReceiver, &udp_um_receiver::data_ready, this, nullptr);
+    disconnect(conn_data);
+    disconnect(conn_rec);
 
     ethernetConnected = false;
     averagingInProgress = false; // флаг остановки измерения температуры

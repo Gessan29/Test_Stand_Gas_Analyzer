@@ -16,7 +16,7 @@ PlotHandles setupMainPlot(QCustomPlot* plot, QCustomPlot* plot_2){
     plot->yAxis->setLabel("Напряжение, В");
 
     plot->yAxis->setRange(0, 2);
-    plot->xAxis->setRange(0, 150);
+    plot->xAxis->setRange(0, 180);
 
     // масштабирование и перетаскивание
     plot->setInteraction(QCP::iRangeDrag, true);
@@ -24,6 +24,7 @@ PlotHandles setupMainPlot(QCustomPlot* plot, QCustomPlot* plot_2){
     plot->axisRect()->setRangeDrag(Qt::Horizontal | Qt::Vertical);
     plot->axisRect()->setRangeZoom(Qt::Horizontal | Qt::Vertical);
 
+    plot->replot();
 
 
     plot_2->xAxis->setLabel("Время, мс");
@@ -36,8 +37,6 @@ PlotHandles setupMainPlot(QCustomPlot* plot, QCustomPlot* plot_2){
     plot_2->setInteraction(QCP::iRangeZoom, true);
     plot_2->axisRect()->setRangeDrag(Qt::Horizontal | Qt::Vertical);
     plot_2->axisRect()->setRangeZoom(Qt::Horizontal | Qt::Vertical);
-
-    plot_2->replot();
 
     return handles;
 }
