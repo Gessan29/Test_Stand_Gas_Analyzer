@@ -44,12 +44,13 @@ private slots:
     void handleParserError();
     void handleParsedPacket();
     void startTesting();
-    void result(uint8_t* packet);
+    void result();
     void handleCaseCommon(double sample, double ratio, const QString& labelText);
+    void check_current();
     void setupPort();
     void peltie();
     void set_param(float temp);
-    void setupConnections();
+    void setupSettings();
     void onResponseTimeout();
     void closeTest();
     void logHtml(const QString& message);
@@ -65,14 +66,13 @@ private:
 
     QTimer* sendTimer; // таймер для отправки следующих пакетов через задержку
     QTimer* responseTimer; // таймер ожидания ответа от МК
-    QTimer* outputTimer = nullptr; // таймер для вывода данных с АЦМ
+    QTimer* plotTimer; // для отрисовки графиков
 
     QVector<double> lastRef, lastAnl, lastX;
-    QTimer *plotTimer;
 
-    QCPGraph* graphRef = nullptr;
-    QCPGraph* graphAnl = nullptr;
-    double xCounter = 0;   // счетчик точек
+    QMetaObject::Connection conn_data, conn_rec;
+
+    PlotHandles plots;
 
     QMutex dataMutex;
     bool dataUpdated = false; // флаг обновления данных для аналит. и реп. каналов

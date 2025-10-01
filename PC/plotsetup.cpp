@@ -1,4 +1,5 @@
 #include "plotsetup.h"
+#include "mainwindow.h"
 
 PlotHandles setupMainPlot(QCustomPlot* plot, QCustomPlot* plot_2){
     PlotHandles handles;
@@ -65,4 +66,33 @@ void plotAdcData(const QByteArray& byteArray, QCustomPlot* plot)
     plot->graph(0)->setData(x, y);
     plot->yAxis->rescale();
     plot->replot();
+}
+
+void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vector)
+{
+        QMutexLocker locker(&dataMutex);
+
+        int n = vector.size();
+        if ( n < 200 ){
+            return;
+        }
+        QVector<double> y(n), x(n);
+
+        for (int i = 0; i < n; ++i) {
+            x[i] = i;
+            y[i] = static_cast<double>(vector[i+1]);
+        }
+
+        lastX = x;
+
+        switch (id) {
+        case um_vector_id::nrm_ref:
+                    lastRef = y;
+                    break;
+                case um_vector_id::nrm_anl:
+                    lastAnl = y;
+                    break;
+        }
+
+        dataUpdated = true;
 }

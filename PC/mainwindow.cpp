@@ -7,7 +7,6 @@ static const quint16 defaultSenderPort = 30000;
 static const quint16 defaultListenPort = 30001;
 
 const double ratio = 0.3589;
-QMetaObject::Connection conn_data, conn_rec;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -17,32 +16,11 @@ MainWindow::MainWindow(QWidget *parent)
     , udpReceiver(new udp_um_receiver(defaultListenPort, this))
     , sendTimer(new QTimer(this))
     , responseTimer(new QTimer(this))
-    , outputTimer(new QTimer(this))
+    , plotTimer(new QTimer(this))
 {
     ui->setupUi(this);
-    setupPort();
-    setupConnections();
-    parser.state = protocol_parser::STATE_SYNC; 
-
-    auto plots = setupMainPlot(ui->customPlot, ui->customPlot_2);
-    graphRef = plots.graphRef;
-    graphAnl = plots.graphAnl;
-
-    plotTimer = new QTimer(this);
-    connect(plotTimer, &QTimer::timeout, this, [this]() {
-        QMutexLocker locker(&dataMutex);
-
-        if (!dataUpdated) return;
-
-        if (graphRef) graphRef->setData(lastX, lastRef);
-        if (graphAnl) graphAnl->setData(lastX, lastAnl);
-
-        ui->customPlot->replot();
-
-        dataUpdated = false;
-
-        });
-
+    setupPort();    
+    setupSettings();
 }
 
 MainWindow::~MainWindow() {
@@ -50,11 +28,28 @@ MainWindow::~MainWindow() {
     port->close();
 }
 
-void MainWindow::setupConnections() {
+void MainWindow::setupSettings() {
     connect(sendTimer, &QTimer::timeout, this, &MainWindow::sendNextPacket);
     connect(responseTimer, &QTimer::timeout, this, &MainWindow::onResponseTimeout);
     responseTimer->setSingleShot(true);
     connect(port, &QSerialPort::readyRead, this, &MainWindow::on_port_ready_read);
+
+    parser.state = protocol_parser::STATE_SYNC;
+
+    plots = setupMainPlot(ui->customPlot, ui->customPlot_2);
+    connect(plotTimer, &QTimer::timeout, this, [this]() {
+        QMutexLocker locker(&dataMutex);
+
+        if (!dataUpdated) return;
+
+        if (plots.graphRef) plots.graphRef->setData(lastX, lastRef);
+        if (plots.graphAnl) plots.graphAnl->setData(lastX, lastAnl);
+
+        ui->customPlot->replot();
+
+        dataUpdated = false;
+
+        });
 }
 
 void MainWindow::setupPort() {
@@ -128,8 +123,8 @@ void MainWindow::logHtml(const QString& message) {
 
 void MainWindow::startTesting()
 {
-    if (graphRef) graphRef->data()->clear();
-    if (graphAnl) graphAnl->data()->clear();
+    if (plots.graphRef) plots.graphRef->data()->clear();
+    if (plots.graphAnl) plots.graphAnl->data()->clear();
     ui->customPlot->replot();
 
     ui->customPlot_2->clearGraphs();
@@ -269,40 +264,7 @@ QString description (const QVector<uint8_t>& packet){
 }
 }
 
-void MainWindow::peltie(){
-    if (currentPacketIndex == 24)
-        return;
-    int16_t volt_raw, tok_raw;
-    float sample_v = 2, bit_v = 2, sample_a = 500, bit_a = 500;
-    uint8_t znak = parser.buffer[5];
-
-    volt_raw = (((parser.buffer[2] & 0xFF) << 8) | (parser.buffer[1] & 0xFF)); // напряжение 0
-    tok_raw = (parser.buffer[3] & 0xFF) | ((parser.buffer[4] & 0xFF) << 8); // ток 0
-
-    float volts = (float)volt_raw / 1000.0;
-    int tok = (int)tok_raw;
-    if (znak == 1){
-        volts = -volts;
-        tok = -tok;
-        sample_v = -sample_v;
-        sample_a = -sample_a;
-    }
-
-    if ( (volts >= sample_v - bit_v && volts <= sample_v + bit_v) && (tok >= sample_a - bit_a && tok <= sample_a + bit_a) ){ // поменять диапазон
-        logHtml(QString("<font color='green'>Измерено: %1 мА — Ток эквивалента элемента Пельтье допустим</font>").arg(tok));
-        logHtml(QString("<font color='green'>Измерено: %1 В — Напряжение эквивалента элемента Пельтье допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)));
-        return;
-    }
-    else {
-       logHtml(QString("<font color='red'>Измерено: %1 мА — Ток эквивалента элемента Пельтье не допустим</font><br>").arg(tok));
-       logHtml(QString("<font color='red'>Измерено: %1 В — Напряжение эквивалента элемента Пельтье не допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)));
-        closeTest();
-    }
-}
-
-void MainWindow::result(uint8_t* packet){
-    uint16_t data;
-    float tok, sample;
+void MainWindow::result(){
 
     switch (currentPacketIndex){
 
@@ -331,44 +293,35 @@ void MainWindow::result(uint8_t* packet){
 
     case 6:
     case 13:
-        sample = 0.15;
-        data = (parser.buffer[2] << 8) | parser.buffer[1];
-        tok = (float)data / 1000.0;
-        tok = tok / (0.018 * 200);
-        if (tok >= sample - 0.1 && tok <= sample + 0.1){
-            logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(tok, 0, 'f', 3));
-        }
-        else {
-           logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(tok, 0, 'f', 3));
-           closeTest();
-           }
+        check_current();
         return;
+
     case 7:
         handleCaseCommon(5, ratio, "Контрольная точка 5V (PW Peltier)");
         return;
     case 8:
-        //handleCaseCommon(5.3, ratio, "Контрольная точка +5.3V");
+        //handleCaseCommon(5.3, ratio, "Контрольная точка +5.3V"); // нет погопина
         return;
     case 9:
-        //handleCaseCommon(3.3, ratio, "Контрольная точка +3.3V");
+        //handleCaseCommon(3.3, ratio, "Контрольная точка +3.3V"); // нет погопина
         return;
     case 10:
-        //handleCaseCommon(4.1, ratio, "Контрольная точка +4.1V (PW laser)");
+        //handleCaseCommon(4.1, ratio, "Контрольная точка +4.1V (PW laser)"); // нет погопина
         return;
     case 14:
-        //handleCaseCommon(1.2, 1, "Контрольная точка +1.2V");
+        handleCaseCommon(1.2, 1, "Контрольная точка +1.2V"); // некорректное напряжение
         return;
     case 15:
-        //handleCaseCommon(1.8, 1, "Контрольная точка +1.8V");
+        handleCaseCommon(1.8, 1, "Контрольная точка +1.8V"); // некорректное напряжение
         return;
     case 16:
-        //handleCaseCommon(2.5, 1, "Контрольная точка +2.5V");
+        handleCaseCommon(2.5, 1, "Контрольная точка +2.5V"); // некорректное напряжение
         return;
     case 17:
         handleCaseCommon(5, ratio, "Контрольная точка +5V (Power GPS)");
         return;
     case 18:
-        handleCaseCommon(5, ratio, "Контрольная точка +5V (REFP)"); // нет контакта
+        handleCaseCommon(5, ratio, "Контрольная точка +5V (REFP)");
         return;
     case 19:
         handleCaseCommon(5, ratio, "Контрольная точка +5VAA (sensor)");
@@ -403,26 +356,19 @@ void MainWindow::result(uint8_t* packet){
 
         logHtml("<font color='blue'>Поиск устройства по Ethernet...</font><br>");
 
-            QEventLoop waitLoop;
-            QTimer waitTimer;
-            waitTimer.setSingleShot(true);
-            connect(&waitTimer, &QTimer::timeout, &waitLoop, &QEventLoop::quit);
-            waitTimer.start(2000);
-            waitLoop.exec();
+        connect(udpReceiver, &udp_um_receiver::device_found,this, &MainWindow::updateConnectionStatus, Qt::UniqueConnection);
+        udpSender->send_search_packet();
 
-            connect(udpReceiver, &udp_um_receiver::device_found,this, &MainWindow::updateConnectionStatus, Qt::UniqueConnection);
-            udpSender->send_search_packet();
+        QEventLoop connectionLoop;
+        QTimer connectionTimer;
+        connectionTimer.setSingleShot(true);
+        connect(&connectionTimer, &QTimer::timeout, &connectionLoop, &QEventLoop::quit);
+        connect(udpReceiver, &udp_um_receiver::device_found, &connectionLoop, &QEventLoop::quit, Qt::UniqueConnection);
 
-            QEventLoop connectionLoop;
-            QTimer connectionTimer;
-            connectionTimer.setSingleShot(true);
-            connect(&connectionTimer, &QTimer::timeout, &connectionLoop, &QEventLoop::quit);
-            connect(udpReceiver, &udp_um_receiver::device_found, &connectionLoop, &QEventLoop::quit, Qt::UniqueConnection);
+        connectionTimer.start(5000);
+        connectionLoop.exec();
 
-                connectionTimer.start(5000);
-                connectionLoop.exec();
-
-                disconnect(udpReceiver, &udp_um_receiver::device_found, &connectionLoop, &QEventLoop::quit);
+        disconnect(udpReceiver, &udp_um_receiver::device_found, &connectionLoop, &QEventLoop::quit);
 
         if (!ethernetConnected){
             logHtml("<font color='red'>Соединение с платой не установлено!</font><br>");
@@ -565,17 +511,7 @@ void MainWindow::result(uint8_t* packet){
         return;
 
     case 35:
-        sample = 0.15;
-        data = (parser.buffer[2] << 8) | parser.buffer[1];
-        tok = (float)data / 1000.0;
-        tok = tok / (0.018 * 200);
-        if (tok >= sample - 0.1 && tok <= sample + 0.1){
-            logHtml(QString("<font color='green'>Измерено: %1 мА — Ток питания платы допустим</font><br>").arg(tok, 0, 'f', 3));
-        }
-        else {
-           logHtml(QString("<font color='red'>Измерено: %1 мА — Ток питания платы не допустим</font><br>").arg(tok, 0, 'f', 3));
-           closeTest();
-           }
+        check_current();
 
         sendTimer->stop();
         responseTimer->stop();
@@ -585,131 +521,6 @@ void MainWindow::result(uint8_t* packet){
         }
         closeTest();
     }
-}
-
-void MainWindow::set_param(float temp){
-
-    udpSender->set_test_settings(std::make_shared<um_test_mode_settings>(um_test_mode_settings{
-            .laserWfm = {
-                .zeroLevel  = 0.0,
-                .beginLevel = 120,
-                .endLevel   = 240,
-                .beginTime  = 0,
-                .endTime    = 150
-            },
-            .workTemp = temp,
-            .workLine = 90,
-            .regParam = {
-                .kp               = 0.1,
-                .ki               = 0,
-                .maxSetDiff       = 1,
-                .lineToTempCoef   = 20,
-                .switchToLineThr  = 15,
-                .lineStableThr    = 0.1
-            },
-            .control = um_test_mode_control::only_temperature
-        })
-    );
-}
-
-void MainWindow::test_temp(float temp){
-    logHtml(QString("Установить температуру %1 °C:</font>").arg(temp));
-    set_param(temp);
-    startAveragingMeasurements();
-}
-
-void MainWindow::startAveragingMeasurements()
-{
-    measurementCount = 0;
-    sumTemperature = 0.0;
-    sumPeltierCurrent = 0.0;
-    averagingInProgress = true;
-
-    if (sendTimer && sendTimer->isActive()) sendTimer->stop();
-
-    QTimer timeoutTimer;
-    timeoutTimer.setSingleShot(true);
-    connect(&timeoutTimer, &QTimer::timeout, &averagingloop, &QEventLoop::quit);
-    timeoutTimer.start(2000);
-
-    conn_data = connect(udpReceiver, &udp_um_receiver::data_ready, this,[this](std::shared_ptr<um_data> data) {
-                if (!averagingInProgress) {
-                    averagingloop.quit();
-                    return;
-                 }
-
-                sumTemperature += data->temperature;
-                sumPeltierCurrent += data->peltierCurrent;
-                measurementCount++;
-
-                if (measurementCount >= requiredMeasurements) {
-                    averagingInProgress = false;
-                    averagingloop.quit();
-                }              
-
-                disconnect(conn_data);
-
-            });
-
-            averagingloop.exec();
-
-            if (measurementCount > 0) {
-                    processAveragedResults();
-                } else {
-                    logHtml("<font color='red'>Нет данных для усреднения температуры!</font><br>");
-                    closeTest();
-                }
-}
-
-void MainWindow::processAveragedResults()
-{
-    if (measurementCount == 0) return;
-
-    double avgTemp = sumTemperature / measurementCount;
-    double avgCurrent = sumPeltierCurrent / measurementCount;
-
-    logHtml(QString("<font color='blue'>Температура: %1 °C</font>").arg(avgTemp));
-    logHtml(QString("<font color='blue'>Ток: %1 мА</font>").arg(avgCurrent));
-
-    float minTemp = 23.0;
-    float maxTemp = 27.5;
-
-    if (avgTemp >= minTemp && avgTemp <= maxTemp) {
-        logHtml("<font color='green'>Температура в допустимом диапазоне.</font><br>");
-        if (sendTimer) sendTimer->start(200);
-    } else {
-        logHtml("<font color='red'>Температура вне допустимого диапазона! Тест остановлен.</font><br>");
-        closeTest();
-    }
-}
-
-void MainWindow::on_um_vector_received(um_vector_id id, std::vector<float> vector)
-{
-        QMutexLocker locker(&dataMutex);
-
-        int n = vector.size();
-        if ( n < 200 ){
-            return;
-        }
-        QVector<double> y(n), x(n);
-
-        for (int i = 0; i < n; ++i) {
-            x[i] = i;
-            y[i] = static_cast<double>(vector[i+1]);
-        }
-
-        lastX = x;
-
-        switch (id) {
-        case um_vector_id::nrm_ref:
-                    lastRef = y;
-                    break;
-                case um_vector_id::nrm_anl:
-                    lastAnl = y;
-                    break;
-        }
-
-        dataUpdated = true;
 }
 
 void MainWindow::check_mode_acm(um_alg_cmd cmd, um_status status){
@@ -739,28 +550,13 @@ void MainWindow::check_mode_acm(um_alg_cmd cmd, um_status status){
         }
 }
 
-void MainWindow::handleCaseCommon(double sample, double ratio, const QString& labelText)
-{
-    const double accuracy = 2; // 0.5
-    uint16_t data = (parser.buffer[2] << 8) | parser.buffer[1]; ; // 10000
-    double volts = (double)data / 1000.0;
-    volts = volts / ratio;
-
-    if (volts >= sample - accuracy && volts <= sample + accuracy) {
-        logHtml(QString("<font color='green'>Измерено: %1 В — %2 напряжение допустимо</font><br><br>").arg(QString::number(volts, 'f', 3)).arg(labelText));
-    } else {
-        logHtml(QString("<font color='red'>Измерено: %1 В — %2 напряжение вне допустимого диапазона</font><br><br>").arg(QString::number(volts, 'f', 3)).arg(labelText));
-        closeTest();
-    }
-}
-
 void MainWindow::handleParsedPacket()
 {
     responseTimer->stop();
 
         switch (parser.buffer[0]){
         case 0x00:
-            result(parser.buffer);
+            result();
             if (isTesting || emergencyStopTriggered) {
                 sendTimer->start(300);
                 return;
